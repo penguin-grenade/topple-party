@@ -49,7 +49,7 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null
-+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install \
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install \
              "platform-tools" \
              "platforms;android-35" \
              "build-tools;35.0.0"
