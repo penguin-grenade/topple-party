@@ -30,6 +30,8 @@ export interface Player {
 }
 
 const now = () => performance.now() / 1000;
+/** seconds to wait for someone to come back before ending a game nobody is in */
+const EMPTY_GRACE = 10;
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 
 export class Game {
@@ -59,6 +61,8 @@ export class Game {
   private mouse: { down: boolean; x: number; y: number; t0: number; dragY: number } = { down: false, x: 0, y: 0, t0: 0, dragY: 0 };
   /** counters for debugging / automated tests */
   private lastKeyBack = 0;
+  private emptySince = 0;
+  private emptyShown = -1;
   stats = { throws: 0, ballHits: 0, booms: 0, scored: 0, last: { x: 0, y: 0, p: 0 } };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -585,7 +589,9 @@ export class Game {
       }
       if (n === 3) this.acc = 0;
       this.handleEvents();
-      if (this.phase !== 'results' && !this.mode.finished) this.mode.update(dt);
+      // while nobody is connected mid-game, hold still (timers, turns) until someone rejoins or it ends
+      const frozen = this.phase === 'playing' && !this.players.some((p) => p.connected);
+      if (this.phase !== 'results' && !this.mode.finished && !frozen) this.mode.update(dt);
       if (this.phase === 'lobby') this.renderer.orbit = Math.sin(tMs / 9000) * 0.22;
     }
     this.handleEvents();
@@ -705,16 +711,42 @@ export class Game {
         this.players = this.players.filter((p) => p.connected || t - p.goneSince < 30);
         if (before !== this.players.length) this.pushViews();
       }
-      if (this.phase === 'playing' && !this.players.some((p) => p.connected)) {
-        // everyone left: go back to the lobby after a grace period
-        if (this.players.every((p) => t - p.goneSince > 45)) this.enterLobby();
-      }
+      this.checkEmptyGame(t);
       if (this.debug) this.hud.setDebug(`${this.renderer.fps.toFixed(0)} fps · scale ${this.renderer.renderScale.toFixed(2)} · bodies ${this.sim.ents.length}`);
     }
     this.viewTimer -= dt;
     if (this.viewTimer <= 0) {
       this.viewTimer = 0.5;
       this.sendViews();
+    }
+  }
+
+  /**
+   * If every player has left mid-game (or on the results screen), end the game and go back to the
+   * lobby. A short countdown lets phones that only blipped (Wi-Fi hiccup, screen lock) rejoin first.
+   */
+  private checkEmptyGame(t: number) {
+    const inGame = this.phase === 'playing' || this.phase === 'results';
+    if (!inGame || this.players.some((p) => p.connected)) {
+      if (this.emptySince) {
+        this.emptySince = 0;
+        this.emptyShown = -1;
+        this.hud.hideBanner();
+      }
+      return;
+    }
+    if (!this.emptySince) this.emptySince = t;
+    const left = Math.ceil(EMPTY_GRACE - (t - this.emptySince));
+    if (left <= 0) {
+      this.emptySince = 0;
+      this.emptyShown = -1;
+      this.enterLobby();
+      this.hud.toast('Everyone left, so the game ended.');
+      return;
+    }
+    if (left !== this.emptyShown) {
+      this.emptyShown = left;
+      this.hud.banner('Everyone left!', `Ending the game in ${left}… scan the code to rejoin`, '#ffd23f', 0);
     }
   }
 

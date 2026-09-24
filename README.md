@@ -106,6 +106,8 @@ browsers may block WebRTC (phones then can't connect); the Android TV app avoids
   secure pages. GitHub Pages takes care of that.
 * Internet is needed for the handshake (and fonts). A dropped phone reconnects automatically and keeps
   its score and color.
+* If every player leaves mid-game, the game freezes and the TV counts down 10 seconds for someone to
+  rejoin, then ends and goes back to the lobby.
 
 **Self-hosting the broker (optional):** run `npm run signal` (starts a PeerJS server on port 9000)
 and open the TV page with `?peerHost=<host>&peerPort=9000&peerSecure=0`. The QR code passes those
