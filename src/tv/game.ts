@@ -492,7 +492,7 @@ export class Game {
         if (!this.paused) this.mode.onGrab(p, clamp(+m.x || 0, -1.1, 1.1), clamp(+m.y || 0, -1.1, 1.1));
         break;
       case 'pull':
-        if (!this.paused) this.mode.onPull(p, clamp(+m.d || 0, -1.5, 1.5), clamp(+m.s || 0, -1, 1));
+        if (!this.paused) this.mode.onPull(p, clamp(+m.d || 0, -1.5, 1.5), clamp(+m.s || 0, -1.5, 1.5));
         break;
       case 'release':
         this.mode.onRelease(p);
@@ -866,7 +866,8 @@ export class Game {
       if (!p) return;
       const n = toNdc(e);
       if (this.mouse.down && this.mode instanceof PullMode) {
-        this.mode.onPull(p, (e.clientY - this.mouse.dragY) / (window.innerHeight * 0.25), 0);
+        const u = window.innerHeight * 0.25;
+        this.mode.onPull(p, (e.clientY - this.mouse.dragY) / u, (e.clientX - this.mouse.x) / u);
         return;
       }
       p.aim = n;

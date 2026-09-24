@@ -44,6 +44,9 @@ export class Renderer {
   // highlights (Tower Pull)
   private outline: THREE.Mesh;
   private outlineOf: Entity | null = null;
+  private arrowRig = new THREE.Group();
+  // drawn on top of everything so the arrow poking into the tower still shows
+  private arrowMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false, depthTest: false, transparent: true, opacity: 0.9 });
 
   // adaptive resolution
   private baseRatio = 1;
@@ -95,6 +98,14 @@ export class Renderer {
     this.outline = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.BackSide, toneMapped: false }));
     this.outline.visible = false;
     this.scene.add(this.outline);
+    const cone = new THREE.ConeGeometry(0.3, 0.62, 16);
+    for (let i = 0; i < 2; i++) {
+      const m = new THREE.Mesh(cone, this.arrowMat);
+      m.renderOrder = 10;
+      this.arrowRig.add(m);
+    }
+    this.arrowRig.visible = false;
+    this.scene.add(this.arrowRig);
 
     this.resize();
     window.addEventListener('resize', () => (this.needResize = true));
@@ -205,16 +216,35 @@ export class Renderer {
       if (m) {
         this.outline.position.copy(m.position);
         this.outline.quaternion.copy(m.quaternion);
+        if (this.arrowRig.visible) {
+          this.arrowRig.position.copy(m.position);
+          this.arrowRig.quaternion.copy(m.quaternion);
+          const pulse = 1 + Math.sin(performance.now() / 160) * 0.12;
+          for (const a of this.arrowRig.children) a.scale.setScalar(pulse);
+        }
       }
     }
   }
 
-  setOutline(e: Entity | null, color = '#ffffff') {
+  /** Highlight a block. With `arrows`, also show which two ways it can slide (Tower Pull grab). */
+  setOutline(e: Entity | null, color = '#ffffff', arrows = false) {
     this.outlineOf = e;
     this.outline.visible = !!e;
+    this.arrowRig.visible = !!e && arrows;
     if (e) {
       this.outline.scale.set(e.size.x + 0.12, e.size.y + 0.12, e.size.z + 0.12);
       (this.outline.material as THREE.MeshBasicMaterial).color.set(color);
+      if (arrows) {
+        this.arrowMat.color.set(color);
+        const alongX = e.size.x > e.size.z;
+        const half = (alongX ? e.size.x : e.size.z) / 2 + 0.55;
+        const [a, b] = this.arrowRig.children;
+        a.position.set(alongX ? half : 0, 0, alongX ? 0 : half);
+        b.position.set(alongX ? -half : 0, 0, alongX ? 0 : -half);
+        // cones point up (+y) by default; tip them over to point out along the block
+        a.rotation.set(alongX ? 0 : Math.PI / 2, 0, alongX ? -Math.PI / 2 : 0);
+        b.rotation.set(alongX ? 0 : -Math.PI / 2, 0, alongX ? Math.PI / 2 : 0);
+      }
     }
   }
 

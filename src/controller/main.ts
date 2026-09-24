@@ -310,8 +310,8 @@ function render() {
         : 'Drag the pad to aim · hold to charge · release to throw'
       : v.control === 'grab'
         ? aimMode === 'motion'
-          ? 'Point at a block · hold GRAB · tilt phone toward you to pull (or slide thumb down)'
-          : 'Drag the pad to aim · hold GRAB · slide thumb down to pull, up to push'
+          ? 'Point at a block · hold GRAB · slide your thumb (or tilt the phone) the way it should move'
+          : 'Drag the pad to aim · hold GRAB · slide your thumb the way the block should move'
         : '';
   $('touchpad').classList.toggle('hidden', aimMode !== 'touch' || v.control === 'none');
   $('camPad').classList.toggle('hidden', !v.camera);
@@ -482,16 +482,16 @@ setInterval(() => {
     camAcc.dx = camAcc.dy = camAcc.dz = 0;
   }
   if (grab) {
-    const app = $('app');
-    const h = app.clientHeight, w = app.clientWidth;
+    // thumb/tilt direction = the direction the block should move on screen (down = toward you)
+    const unit = 0.45 * $('app').clientWidth;
     const thumb = toLocal(grab.tx - grab.tx0, grab.ty - grab.ty0);
-    let d = thumb.y / (0.22 * h);
-    let s = thumb.x / (0.3 * w);
+    let d = thumb.y / unit;
+    let s = thumb.x / unit;
     if (aimMode === 'motion') {
       d += (motion.relPitch - grab.pitch0) / (18 * DEG);
       s += -(motion.relYaw - grab.yaw0) / (18 * DEG);
     }
-    send({ t: 'pull', d: Math.max(-1.5, Math.min(1.5, d)), s: Math.max(-1, Math.min(1, s)) });
+    send({ t: 'pull', d: Math.max(-1.5, Math.min(1.5, d)), s: Math.max(-1.5, Math.min(1.5, s)) });
     return;
   }
   if (view.control === 'none') return;

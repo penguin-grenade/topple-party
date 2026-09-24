@@ -2,6 +2,7 @@ import type { PadView } from '../shared/protocol';
 import type { Game, Player } from './game';
 import { BLOCK_TYPES, isPrize, type BlockType } from './sim/blocks';
 import { buildLevel, levelsFor, PRACTICE, TOWER, JENGA_LAYERS, JENGA_H, type LevelDef } from './sim/levels';
+import * as THREE from 'three';
 import { pos, type Entity, type SimEvent, type V3 } from './sim/sim';
 
 export type PadPart = Pick<PadView, 'screen' | 'title' | 'sub' | 'control' | 'ammo' | 'camera'>;
@@ -375,6 +376,9 @@ export class PullMode extends Mode {
   private snapshot = new Map<Entity, V3>();
   private grabbed: Entity | null = null;
   private grabAxis: V3 = { x: 1, y: 0, z: 0 };
+  /** camera basis frozen at grab time: horizontal "toward the viewer" and "screen right" */
+  private grabToward: V3 = { x: 0, y: 0, z: 1 };
+  private grabRight: V3 = { x: 1, y: 0, z: 0 };
   private hover: Entity | null = null;
   private checkMsg = '';
   private creakT = 0;
@@ -557,19 +561,19 @@ export class PullMode extends Mode {
       return;
     }
     const alongX = e.size.x > e.size.z;
-    const axis = alongX ? { x: 1, y: 0, z: 0 } : { x: 0, y: 0, z: 1 };
-    const c = pos(e);
-    let side = (hit!.point.x - c.x) * axis.x + (hit!.point.z - c.z) * axis.z;
-    if (Math.abs(side) < 0.5) {
-      const cam = g.renderer.camera.position;
-      side = (cam.x - c.x) * axis.x + (cam.z - c.z) * axis.z;
-    }
-    const s = side >= 0 ? 1 : -1;
-    this.grabAxis = { x: axis.x * s, y: 0, z: axis.z * s };
+    this.grabAxis = alongX ? { x: 1, y: 0, z: 0 } : { x: 0, y: 0, z: 1 };
+    // The player steers in screen terms (thumb down / tilt back = toward me, left/right = screen
+    // left/right). Freeze the camera's horizontal basis now so moving the camera mid-pull can't
+    // yank the block somewhere else.
+    const dir = g.renderer.camera.getWorldDirection(new THREE.Vector3());
+    const len = Math.hypot(dir.x, dir.z) || 1;
+    const fx = dir.x / len, fz = dir.z / len;
+    this.grabToward = { x: -fx, y: 0, z: -fz };
+    this.grabRight = { x: -fz, y: 0, z: fx };
     g.sim.grabStart(e, this.grabAxis);
     this.grabbed = e;
     this.hover = null;
-    g.renderer.setOutline(e, p.color);
+    g.renderer.setOutline(e, p.color, true);
     g.buzz(p, 35);
     g.sfx.blip(true);
   }
@@ -577,9 +581,12 @@ export class PullMode extends Mode {
     if (p !== this.active || (this.phase !== 'turn' && this.phase !== 'intro')) return;
     this.game.renderer.nudgeCamera(dx, dy, dz);
   }
+  /** d: toward (+) / away from (-) the viewer, s: screen right (+) / left (-); 1 = about one block length */
   onPull(p: Player, d: number, s: number) {
     if (p !== this.active || !this.grabbed) return;
-    this.game.sim.grabSet(d, s);
+    const t = this.grabToward, r = this.grabRight;
+    const k = 2.6;
+    this.game.sim.grabOffset((t.x * d + r.x * s) * k, (t.z * d + r.z * s) * k);
   }
   onRelease(p: Player) {
     if (p !== this.active) return;

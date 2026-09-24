@@ -29,7 +29,7 @@ async function main() {
         const axis = alongX ? { x: 1, y: 0, z: 0 } : { x: 0, y: 0, z: 1 };
         sim.grabStart(ent, axis);
         let out = false;
-        run(sim, 3, (t) => { if (ent.gone) return; sim.grabSet(Math.min(1.1, t * 0.6), Math.sin(t * 6) * 0.3); const p = pos(ent); if (!out && Math.abs((p.x - ent.home.x) * axis.x + (p.z - ent.home.z) * axis.z) > 2.1) { out = true; sim.grabEnd(); sim.remove(ent); } });
+        run(sim, 3, (t) => { if (ent.gone) return; const D = Math.min(1.1, t * 0.6) * 2.6, W = Math.sin(t * 6) * 1.5; sim.grabOffset(axis.x * D - axis.z * W, axis.z * D + axis.x * W); const p = pos(ent); if (!out && Math.abs((p.x - ent.home.x) * axis.x + (p.z - ent.home.z) * axis.z) > 2.1) { out = true; sim.grabEnd(); sim.remove(ent); } });
         const moved = ent.gone ? 'OUT' : ((pos(ent).x - ent.home.x) * axis.x + (pos(ent).z - ent.home.z) * axis.z).toFixed(2);
         if (!ent.gone) sim.grabEnd();
         run(sim, 2);

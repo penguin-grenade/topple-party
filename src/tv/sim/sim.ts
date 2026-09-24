@@ -331,12 +331,17 @@ export class Sim {
     ent.body.setLinearDamping(1.5);
     ent.body.wakeUp();
   }
-  /** d: pull distance in block-lengths (+ = out toward you, - = push), s: sideways wiggle in [-1, 1] */
-  grabSet(d: number, s: number) {
+  /**
+   * Where the player wants the block to go, as a horizontal offset from where it was grabbed.
+   * A tower block can only really slide along its length, so the offset is projected onto that axis
+   * (plus a little sideways give so it can be wiggled loose).
+   */
+  grabOffset(ox: number, oz: number) {
     const g = this.grab;
     if (!g) return;
-    const D = d * 2.6, S = s * 0.35;
-    g.target = v3(g.anchor.x + g.axis.x * D + g.side.x * S, g.anchor.y, g.anchor.z + g.axis.z * D + g.side.z * S);
+    const along = ox * g.axis.x + oz * g.axis.z;
+    const perp = (ox * g.side.x + oz * g.side.z) * 0.2;
+    g.target = v3(g.anchor.x + g.axis.x * along + g.side.x * perp, g.anchor.y, g.anchor.z + g.axis.z * along + g.side.z * perp);
   }
   grabEnd() {
     const g = this.grab;
