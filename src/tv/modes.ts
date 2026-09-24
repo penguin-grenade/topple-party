@@ -4,7 +4,7 @@ import { BLOCK_TYPES, isPrize, type BlockType } from './sim/blocks';
 import { buildLevel, levelsFor, PRACTICE, TOWER, JENGA_LAYERS, JENGA_H, type LevelDef } from './sim/levels';
 import { pos, type Entity, type SimEvent, type V3 } from './sim/sim';
 
-export type PadPart = Pick<PadView, 'screen' | 'title' | 'sub' | 'control' | 'ammo'>;
+export type PadPart = Pick<PadView, 'screen' | 'title' | 'sub' | 'control' | 'ammo' | 'camera'>;
 export interface HudPart {
   left: string;
   center: string;
@@ -35,6 +35,7 @@ export abstract class Mode {
   onGrab(_p: Player, _x: number, _y: number): void {}
   onPull(_p: Player, _d: number, _s: number): void {}
   onRelease(_p: Player): void {}
+  onCamera(_p: Player, _dx: number, _dy: number, _dz: number): void {}
   onJoin(_p: Player): void {}
   onLeave(_p: Player): void {}
   reticleVisible(p: Player): boolean {
@@ -382,7 +383,11 @@ export class PullMode extends Mode {
   private creakT = 0;
 
   start() {
+    this.game.renderer.camRate = 7; // snappy: the active player steers it
     this.buildTower();
+  }
+  dispose() {
+    this.game.renderer.camRate = 2.6;
   }
   private buildTower() {
     const g = this.game;
@@ -408,9 +413,10 @@ export class PullMode extends Mode {
     this.grabbed = null;
     this.hover = null;
     g.renderer.setOutline(null);
-    // walk around the tower a quarter turn each turn so every side gets a look
-    g.renderer.orbit = -((this.turnCount - 1) % 4) * (Math.PI / 2);
-    g.hud.banner(`${next.name}'s turn`, 'Aim at a block · hold GRAB · tilt back to pull', next.color, 1800);
+    // each turn starts at the default height/zoom, looking from wherever the last player left the camera
+    g.renderer.lift = 0;
+    g.renderer.zoom = 1;
+    g.hud.banner(`${next.name}'s turn`, 'Drag the camera pad to look around · hold GRAB to pull', next.color, 1800);
     g.buzz(next, [60, 60, 60]);
     g.pushViews();
   }
@@ -579,6 +585,10 @@ export class PullMode extends Mode {
     g.buzz(p, 35);
     g.sfx.blip(true);
   }
+  onCamera(p: Player, dx: number, dy: number, dz: number) {
+    if (p !== this.active || (this.phase !== 'turn' && this.phase !== 'intro')) return;
+    this.game.renderer.nudgeCamera(dx, dy, dz);
+  }
   onPull(p: Player, d: number, s: number) {
     if (p !== this.active || !this.grabbed) return;
     this.game.sim.grabSet(d, s);
@@ -608,8 +618,8 @@ export class PullMode extends Mode {
     if (this.phase === 'toppled') return { screen: 'wait', control: 'none', title: 'TOPPLED!', sub: a ? `${a.name} knocked it over` : '' };
     if (this.phase === 'build') return { screen: 'wait', control: 'none', title: 'New tower!', sub: 'Get ready…' };
     if (p === a) {
-      if (this.phase === 'turn') return { screen: 'play', control: 'grab', title: 'Your turn!', sub: 'Pull one block all the way out' };
-      if (this.phase === 'intro') return { screen: 'wait', control: 'none', title: 'Your turn next!', sub: 'Point at the TV' };
+      if (this.phase === 'turn') return { screen: 'play', control: 'grab', title: 'Your turn!', sub: 'Pull one block all the way out', camera: true };
+      if (this.phase === 'intro') return { screen: 'wait', control: 'none', title: 'Your turn next!', sub: 'Point at the TV', camera: true };
       return { screen: 'wait', control: 'none', title: this.checkMsg || 'Nice!', sub: 'Waiting for the tower to settle…' };
     }
     return { screen: 'wait', control: 'none', title: a ? `${a.name}'s turn` : 'Get ready', sub: 'Hold your breath…' };

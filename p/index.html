@@ -76,6 +76,14 @@
   #touchpad { flex: 1; min-height: 120px; border-radius: 20px; border: 3px dashed #ffffff33; display: flex; align-items: center; justify-content: center;
     color: var(--muted); font-weight: 600; touch-action: none; position: relative; }
   .spacer { flex: 1; }
+  #camPad { position: relative; flex: none; height: 128px; border-radius: 20px; border: 3px solid #ffffff2a; touch-action: none;
+    background: repeating-linear-gradient(90deg, #ffffff0a 0 18px, transparent 18px 36px), #00000033;
+    display: flex; align-items: center; padding: 0 70px 0 16px; color: var(--muted); font-weight: 600; font-size: 15px; line-height: 1.5; }
+  #camPad b { color: #fff; }
+  #camPad.active { border-color: var(--me); background-color: color-mix(in srgb, var(--me) 15%, transparent); }
+  .zoomBtns { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; }
+  .zoomBtns button { width: 48px; height: 48px; border-radius: 50%; border: 0; background: #ffffff22; font-size: 24px; font-weight: 700; line-height: 1; }
+  .zoomBtns button:active { background: var(--me); }
 
   #actionWrap { position: relative; display: flex; justify-content: center; align-items: center; padding: 8px 0; }
   #action { position: relative; width: min(62vw, 34vh); height: min(62vw, 34vh); border-radius: 50%; border: 6px solid #fff;
@@ -137,6 +145,10 @@
     <header><span id="swatch"></span><span id="pname">Player</span><span id="pscore">0 pts</span></header>
     <div id="status"><h1 id="title">Hi!</h1><p id="sub"></p><div id="ammo"></div></div>
     <div id="hostPanel" class="hidden"></div>
+    <div id="camPad" class="hidden">
+      <div class="camLabel">Drag <b>↔</b> to turn the tower<br />Drag <b>↕</b> to look higher / lower</div>
+      <div class="zoomBtns"><button id="zoomIn" aria-label="Zoom in">＋</button><button id="zoomOut" aria-label="Zoom out">−</button></div>
+    </div>
     <div id="touchpad" class="hidden">Drag here to aim</div>
     <div class="spacer"></div>
     <div id="actionWrap">

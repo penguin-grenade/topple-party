@@ -312,6 +312,7 @@ function render() {
           : 'Drag the pad to aim · hold GRAB · slide thumb down to pull, up to push'
         : '';
   $('touchpad').classList.toggle('hidden', aimMode !== 'touch' || v.control === 'none');
+  $('camPad').classList.toggle('hidden', !v.camera);
 }
 
 function hostButton(text: string, cls: string, fn: () => void) {
@@ -356,6 +357,43 @@ pad.addEventListener('pointermove', (e) => {
 const endPad = () => (padPointer = null);
 pad.addEventListener('pointerup', endPad);
 pad.addEventListener('pointercancel', endPad);
+
+// ---------- camera pad (Tower Pull): drag to orbit / raise, pinch or buttons to zoom ----------
+const camPad = $('camPad');
+const camTouches = new Map<number, { x: number; y: number }>();
+const camAcc = { dx: 0, dy: 0, dz: 0 };
+const pinchDist = () => {
+  const [a, b] = [...camTouches.values()];
+  return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+};
+camPad.addEventListener('pointerdown', (e) => {
+  if ((e.target as HTMLElement).closest('button')) return;
+  camPad.setPointerCapture(e.pointerId);
+  camTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  camPad.classList.add('active');
+});
+camPad.addEventListener('pointermove', (e) => {
+  const prev = camTouches.get(e.pointerId);
+  if (!prev) return;
+  if (camTouches.size >= 2) {
+    const before = pinchDist();
+    camTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    camAcc.dz -= (pinchDist() - before) / 300; // spread fingers = zoom in
+    return;
+  }
+  const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+  camTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  camAcc.dx -= (dx / camPad.clientWidth) * Math.PI; // the tower turns with your finger
+  camAcc.dy -= (dy / camPad.clientHeight) * 4; // drag up to look higher
+});
+const camUp = (e: PointerEvent) => {
+  camTouches.delete(e.pointerId);
+  if (!camTouches.size) camPad.classList.remove('active');
+};
+camPad.addEventListener('pointerup', camUp);
+camPad.addEventListener('pointercancel', camUp);
+$('zoomIn').addEventListener('click', () => (camAcc.dz -= 0.12));
+$('zoomOut').addEventListener('click', () => (camAcc.dz += 0.12));
 
 // ---------- action button: throw / grab ----------
 let pressed = false;
@@ -438,6 +476,10 @@ let lastSent = { x: 9, y: 9, t: 0 };
 setInterval(() => {
   if (!link || !view) return;
   const now = performance.now();
+  if (camAcc.dx || camAcc.dy || camAcc.dz) {
+    send({ t: 'cam', dx: +camAcc.dx.toFixed(4), dy: +camAcc.dy.toFixed(3), dz: +camAcc.dz.toFixed(3) });
+    camAcc.dx = camAcc.dy = camAcc.dz = 0;
+  }
   if (grab) {
     const h = window.innerHeight, w = window.innerWidth;
     let d = (grab.ty - grab.ty0) / (0.22 * h);

@@ -497,6 +497,9 @@ export class Game {
       case 'release':
         this.mode.onRelease(p);
         break;
+      case 'cam':
+        if (!this.paused) this.mode.onCamera(p, clamp(+m.dx || 0, -1, 1), clamp(+m.dy || 0, -3, 3), clamp(+m.dz || 0, -0.5, 0.5));
+        break;
       case 'name':
         p.name = cleanName(m.name);
         this.pushViews();
@@ -832,6 +835,12 @@ export class Game {
       return;
     }
     if (this.phase === 'playing' && esc) this.pause();
+    if (this.phase === 'playing' && this.mode instanceof PullMode && (left || right || up || down)) {
+      this.renderer.nudgeCamera(left ? 0.35 : right ? -0.35 : 0, up ? 0.8 : down ? -0.8 : 0, 0);
+    }
+    if (this.phase === 'playing' && this.mode instanceof PullMode && (k === '+' || k === '=' || k === '-')) {
+      this.renderer.nudgeCamera(0, 0, k === '-' ? 0.1 : -0.1);
+    }
   }
 
   // ------------------------------------------------------------------ mouse player (for playing/testing on a PC)
@@ -868,6 +877,9 @@ export class Game {
       if (!p || e.button !== 0 || (e.target as HTMLElement).closest?.('[data-act]')) return;
       this.mouse = { down: true, x: e.clientX, y: e.clientY, t0: now(), dragY: e.clientY };
       if (this.mode instanceof PullMode) this.mode.onGrab(p, p.aim.x, p.aim.y);
+    });
+    window.addEventListener('wheel', (e) => {
+      if (this.phase === 'playing' && this.mode instanceof PullMode) this.renderer.nudgeCamera(0, 0, Math.sign(e.deltaY) * 0.06);
     });
     window.addEventListener('mouseup', (e) => {
       const p = mp();

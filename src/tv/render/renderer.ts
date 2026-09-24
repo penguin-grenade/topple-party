@@ -30,6 +30,14 @@ export class Renderer {
   private camLook = new THREE.Vector3(0, 3, 0);
   orbit = 0;
   private orbitNow = 0;
+  /** player camera control (Tower Pull): raise/lower the view and zoom */
+  lift = 0;
+  zoom = 1;
+  private liftNow = 0;
+  private zoomNow = 1;
+  /** how quickly the camera follows its target (higher = snappier, for hands-on control) */
+  camRate = 2.6;
+  private trees: THREE.Mesh[] = [];
   sway = 1;
   private t = 0;
 
@@ -74,7 +82,9 @@ export class Renderer {
     this.sun.shadow.normalBias = 0.03;
     this.scene.add(this.sun, this.sun.target);
 
-    this.scene.add(makeIsland());
+    const island = makeIsland();
+    this.trees = island.userData.trees as THREE.Mesh[];
+    this.scene.add(island);
     this.scene.add(this.plinthGroup);
     for (const g of makeClouds()) {
       this.cloudGroups.push(g);
@@ -122,11 +132,22 @@ export class Renderer {
 
   setCamera(spec: CamSpec, instant = false) {
     this.camSpec = spec;
+    this.lift = 0;
+    this.zoom = 1;
     if (instant) {
       this.camPos.set(...spec.pos);
       this.camLook.set(...spec.look);
       this.orbitNow = this.orbit;
+      this.liftNow = 0;
+      this.zoomNow = 1;
     }
+  }
+
+  /** Move the camera around the current level: yaw in radians, lift in world units, zoom as a factor delta. */
+  nudgeCamera(dYaw: number, dLift: number, dZoom: number, limits = { liftMin: -4, liftMax: 4.5, zoomMin: 0.55, zoomMax: 1.25 }) {
+    this.orbit += dYaw;
+    this.lift = Math.max(limits.liftMin, Math.min(limits.liftMax, this.lift + dLift));
+    this.zoom = Math.max(limits.zoomMin, Math.min(limits.zoomMax, this.zoom + dZoom));
   }
 
   private geoFor(sx: number, sy: number, sz: number): THREE.BufferGeometry {
@@ -228,10 +249,14 @@ export class Renderer {
     }
     this.t += dt;
     // camera easing
-    const k = 1 - Math.exp(-dt * 2.6);
+    const k = 1 - Math.exp(-dt * this.camRate);
+    const k2 = 1 - Math.exp(-dt * this.camRate * 0.85);
+    this.orbitNow += (this.orbit - this.orbitNow) * k2;
+    this.liftNow += (this.lift - this.liftNow) * k2;
+    this.zoomNow += (this.zoom - this.zoomNow) * k2;
     const look = new THREE.Vector3(...this.camSpec.look);
-    this.orbitNow += (this.orbit - this.orbitNow) * (1 - Math.exp(-dt * 2.2));
-    const rel = new THREE.Vector3(...this.camSpec.pos).sub(look).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.orbitNow);
+    const rel = new THREE.Vector3(...this.camSpec.pos).sub(look).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.orbitNow).multiplyScalar(this.zoomNow);
+    look.y += this.liftNow;
     const want = look.clone().add(rel);
     this.camPos.lerp(want, k);
     this.camLook.lerp(look, k);
@@ -243,11 +268,30 @@ export class Renderer {
       this.camPos.z + (Math.random() - 0.5) * shake,
     );
     this.camera.lookAt(this.camLook);
+    this.clearView(dt);
 
     for (let i = 0; i < this.cloudGroups.length; i++) this.cloudGroups[i].rotation.y += dt * (0.006 + i * 0.004);
     this.fx.update(dt);
     this.gl.render(this.scene, this.camera);
     this.adapt(dt * 1000);
+  }
+
+  /** Shrink trees that stand between the camera and what it's looking at (or right next to the camera). */
+  private clearView(dt: number) {
+    const cx = this.camera.position.x, cz = this.camera.position.z;
+    const lx = this.camLook.x - cx, lz = this.camLook.z - cz;
+    const len2 = lx * lx + lz * lz || 1;
+    for (const t of this.trees) {
+      const tx = t.position.x - cx, tz = t.position.z - cz;
+      const along = (tx * lx + tz * lz) / len2; // 0 at camera, 1 at the look point
+      const px = tx - lx * along, pz = tz - lz * along;
+      const side = Math.hypot(px, pz);
+      const blocking = (along > -0.05 && along < 0.95 && side < 3.2) || Math.hypot(tx, tz) < 3.5;
+      const want = blocking ? 0.001 : 1;
+      const s = t.scale.x + (want - t.scale.x) * (1 - Math.exp(-dt * 9));
+      t.scale.setScalar(s);
+      t.visible = s > 0.02;
+    }
   }
 
   private adapt(ms: number) {
@@ -356,24 +400,36 @@ function makeIsland(): THREE.Group {
     if (z > 2) continue;
     treeSpots.push([x, z]);
   }
+  // each tree is its own mesh (built around its base) so it can duck out of the camera's way
+  const decoMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true });
+  const trees: THREE.Mesh[] = [];
   for (const [x, z] of treeSpots) {
     const h = rnd(1.6, 2.8);
+    const tp: THREE.BufferGeometry[] = [];
     const trunk = new THREE.CylinderGeometry(0.18, 0.26, h, 6);
-    trunk.translate(x, h / 2, z);
-    parts.push(colored(trunk, '#8a5a3b', 0.1));
+    trunk.translate(0, h / 2, 0);
+    tp.push(colored(trunk, '#8a5a3b', 0.1));
     const kind = Math.random();
     if (kind < 0.5) {
       for (let k = 0; k < 3; k++) {
         const cone = new THREE.ConeGeometry(1.3 - k * 0.3, 1.5, 7);
-        cone.translate(x, h + 0.4 + k * 0.75, z);
-        parts.push(colored(cone, k % 2 ? '#3fae52' : '#4cc15e', 0.15));
+        cone.translate(0, h + 0.4 + k * 0.75, 0);
+        tp.push(colored(cone, k % 2 ? '#3fae52' : '#4cc15e', 0.15));
       }
     } else {
       const puff = new THREE.IcosahedronGeometry(rnd(1.1, 1.6), 0);
-      puff.translate(x, h + 0.9, z);
-      parts.push(colored(puff, Math.random() < 0.3 ? '#ff9ec7' : '#5ccf66', 0.2));
+      puff.translate(0, h + 0.9, 0);
+      tp.push(colored(puff, Math.random() < 0.3 ? '#ff9ec7' : '#5ccf66', 0.2));
     }
+    const g = mergeGeometries(tp);
+    g.computeVertexNormals();
+    const tree = new THREE.Mesh(g, decoMat);
+    tree.position.set(x, 0, z);
+    tree.castShadow = tree.receiveShadow = true;
+    trees.push(tree);
+    grp.add(tree);
   }
+  grp.userData.trees = trees;
   for (let i = 0; i < 22; i++) {
     const a = rnd(0, Math.PI * 2), r = rnd(7, ISLAND_R - 0.8);
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
@@ -390,7 +446,7 @@ function makeIsland(): THREE.Group {
   }
   const merged = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
   merged.computeVertexNormals();
-  const deco = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true }));
+  const deco = new THREE.Mesh(merged, decoMat);
   deco.castShadow = true;
   deco.receiveShadow = true;
   grp.add(deco);

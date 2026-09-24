@@ -38,6 +38,8 @@ export interface PadView {
   rank?: number;
   /** seconds until next throw allowed (cooldown hint) */
   cooldown?: number;
+  /** show the camera pad (Tower Pull: move the view around the tower) */
+  camera?: boolean;
 }
 
 export type HostAction =
@@ -57,6 +59,8 @@ export type C2S =
   | { t: 'grab'; x: number; y: number }
   | { t: 'pull'; d: number; s: number }
   | { t: 'release' }
+  /** camera deltas: dx = turn (radians), dy = raise/lower (world units), dz = zoom change */
+  | { t: 'cam'; dx: number; dy: number; dz: number }
   | ({ t: 'host' } & HostAction)
   | { t: 'name'; name: string }
   | { t: 'ping'; ts: number };
