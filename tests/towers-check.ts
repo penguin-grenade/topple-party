@@ -7,16 +7,17 @@
 //   * idle:    settle it like the game does, then keep every piece awake for 20 s. It must not creep
 //              or fall over by itself.
 //   * survey:  on a fresh tower, pull each piece in turn. Every piece must slide out (nothing stuck);
-//              reports which first pulls topple the tower ("traps").
-//   * games:   play whole games with bots that pull a random piece each turn (--games), and careful
-//              bots that try up to 10 pieces first and take one that holds (--careful). How many pulls
-//              a tower lasts is the best proxy for how hard, and how long, it plays.
+//              reports which first pulls knock other pieces down ("spills") or drop a crown ("traps").
+//   * games:   play whole towers by the game's rules (spills cost points but play goes on; a fallen
+//              crown ends the tower) with bots that pull a random piece each turn (--games), and
+//              careful bots that try up to 10 pieces first and take one that holds (--careful). How
+//              many pulls a tower lasts is the best proxy for how hard, and how long, it plays.
 // Exits non-zero if a tower can't stand on its own or has a piece that won't slide.
 
 import { Sim, initPhysics, pos, type Entity, type V3 } from '../src/tv/sim/sim';
 import { buildLevel, type LevelSpec } from '../src/tv/sim/levels';
 import { TOWERS, TOWER_CONTACT_HZ, type TowerDef } from '../src/tv/sim/towers';
-import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, toppled } from '../src/tv/sim/pull';
+import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, snapshotOf, fallenPieces, fallenCrown } from '../src/tv/sim/pull';
 import type { BlockType } from '../src/tv/sim/blocks';
 import { VARIANTS } from './tower-variants';
 
@@ -89,8 +90,10 @@ function restore(sim: Sim, def: TowerDef, spec: LevelSpec, st: Saved[]) {
 interface PullResult {
   out: boolean;
   stuck: boolean;
-  topple: boolean;
-  culprit?: string;
+  /** a crown fell: the tower is over */
+  crown: boolean;
+  /** other pieces knocked down (and cleared away) */
+  fell: number;
   secs: number;
 }
 /**
@@ -106,14 +109,23 @@ function pull(sim: Sim, e: Entity, opts: { sign?: number; speed?: number; wiggle
   const thr = outThreshold(e);
   const speed = opts.speed ?? 1.3;
   const wig = opts.wiggle ?? 0.4;
-  const snapshot = snap(sim);
+  // the same bookkeeping as the game's PullMode
+  const snapshot = snapshotOf(sim.blocks());
+  const rubble = new Set<Entity>();
+  const crownDown = () => !!fallenCrown(snapshot);
+  const watch = () => {
+    for (const f of fallenPieces(snapshot, rubble)) {
+      if (f === e) out = true; // the piece in hand tipped out: that's the pull
+      else rubble.add(f);
+    }
+  };
   sim.grabStart(e, axis);
   let t = 0;
   let out = false;
   let tried = 0;
   let lastProgressT = 0;
   let best = 0;
-  while (t < 14) {
+  while (t < 14 && !out) {
     const along = sign * Math.min(thr + 1.2, (t - lastProgressT) * speed);
     const perp = Math.sin(t * 7) * wig;
     sim.grabOffset(axis.x * along - axis.z * perp, axis.z * along + axis.x * perp);
@@ -121,15 +133,12 @@ function pull(sim: Sim, e: Entity, opts: { sign?: number; speed?: number; wiggle
     t += FRAME;
     const od = outDistance(e, axis) * sign;
     if (od > best + 0.05) best = od;
-    if (Math.abs(outDistance(e, axis)) > thr) {
-      out = true;
-      break;
-    }
-    if (toppled(snapshot, e)) {
+    if (Math.abs(outDistance(e, axis)) > thr) out = true;
+    if (crownDown()) {
       sim.grabEnd();
-      const culprit = toppled(snapshot, e)!;
-      return { out: false, stuck: false, topple: true, culprit: culprit.type, secs: t };
+      return { out: false, stuck: false, crown: true, fell: rubble.size, secs: t };
     }
+    watch();
     // no progress: try the other way once (blocked by something at that end)
     if (t - lastProgressT > 4 && best < 0.4 && !tried) {
       tried = 1;
@@ -138,23 +147,31 @@ function pull(sim: Sim, e: Entity, opts: { sign?: number; speed?: number; wiggle
       best = 0;
     }
   }
-  if (!out) {
-    sim.grabEnd();
-    return { out: false, stuck: true, topple: false, secs: t };
-  }
   sim.grabEnd();
+  if (!out) return { out: false, stuck: true, crown: false, fell: rubble.size, secs: t };
   sim.remove(e);
-  // check phase: at least 2.4 s and until things stop moving (max 8 s)
-  let s = 0;
-  while (s < 8) {
-    sim.step();
-    s += FRAME;
-    const who = toppled(snapshot, e);
-    if (who) return { out: true, stuck: false, topple: true, culprit: who.type, secs: t + s };
-    if (s > 2.4 && movement(sim) < 0.2) break;
+  snapshot.delete(e);
+  // check phase: settle (2.4 s at least, 9 s at most), clear what fell, settle again
+  let fell = 0;
+  for (let round = 0; round < 6; round++) {
+    let s = round === 0 ? 0 : 1.2;
+    while (s < 9) {
+      sim.step();
+      s += FRAME;
+      if (crownDown()) return { out: true, stuck: false, crown: true, fell: fell + rubble.size, secs: t };
+      watch();
+      if (s > 2.4 && movement(sim) < 0.2) break;
+    }
+    if (s >= 9) slowSettles++;
+    if (!rubble.size || round === 5) break;
+    for (const r of rubble) {
+      sim.remove(r);
+      snapshot.delete(r);
+      fell++;
+    }
+    rubble.clear();
   }
-  if (s >= 8) slowSettles++;
-  return { out: true, stuck: false, topple: false, secs: t };
+  return { out: true, stuck: false, crown: false, fell, secs: t };
 }
 
 function towerCenter(sim: Sim): V3 {
@@ -168,6 +185,36 @@ function towerCenter(sim: Sim): V3 {
 }
 
 // ------------------------------------------------------------------ tests
+/**
+ * Building mistakes: a piece whose only support is one piece running the same way right under it.
+ * Pulling that one drops the one above, so it plays like a trap nobody can see.
+ */
+function stackingProblems(spec: LevelSpec): string[] {
+  const ps = spec.blocks.filter((b) => b.type === 'jenga' || b.type === 'jgold');
+  const axis = (b: (typeof ps)[number]) => {
+    const a = b.sx >= b.sz ? b.rotY : b.rotY + Math.PI / 2;
+    return { x: Math.cos(a), z: -Math.sin(a), len: Math.max(b.sx, b.sz) };
+  };
+  const out: string[] = [];
+  for (const up of ps) {
+    const au = axis(up);
+    const under = ps.filter((d) => {
+      if (Math.abs(up.y - d.y - (d.sy + up.sy) / 2 - 0.003) > 0.02) return false;
+      const ad = axis(d);
+      for (let k = -4; k <= 4; k++) {
+        const rx = up.x + (au.x * au.len * k) / 8.4 - d.x, rz = up.z + (au.z * au.len * k) / 8.4 - d.z;
+        if (Math.abs(rx * ad.x + rz * ad.z) <= ad.len / 2 && Math.abs(-rx * ad.z + rz * ad.x) <= 0.5) return true;
+      }
+      return false;
+    });
+    if (under.length === 1) {
+      const ad = axis(under[0]);
+      if (Math.abs(au.x * ad.x + au.z * ad.z) > 0.9) out.push(`piece at (${up.x.toFixed(2)}, ${up.y.toFixed(2)}, ${up.z.toFixed(2)}) rests on a single parallel piece`);
+    }
+  }
+  return out;
+}
+
 function idle(def: TowerDef, spec: LevelSpec) {
   const sim = new Sim();
   load(sim, def, spec);
@@ -176,15 +223,17 @@ function idle(def: TowerDef, spec: LevelSpec) {
   sim.settle(SETTLE);
   let settleDrift = 0;
   for (const [e, p0] of built) settleDrift = e.gone ? 99 : Math.max(settleDrift, Math.hypot(pos(e).x - p0.x, pos(e).y - p0.y, pos(e).z - p0.z));
-  // then keep everything awake for 20 s (as if a long turn kept the tower stirred up) and measure creep
+  // then keep everything awake for 20 s (as if a long turn kept the tower stirred up): nothing may
+  // fall and nothing may creep
   const snapshot = snap(sim);
+  const poses = snapshotOf(sim.blocks());
   let fell: Entity | null = null;
   let fellAt = 0;
   for (let i = 0; i < 20 * 60; i++) {
     if (i % 30 === 0) for (const e of sim.ents) e.body.wakeUp();
     sim.step();
     if (!fell) {
-      fell = toppled(snapshot, null);
+      fell = fallenCrown(poses) ?? fallenPieces(poses)[0] ?? null;
       if (fell) fellAt = i / 60;
     }
   }
@@ -201,6 +250,7 @@ function survey(def: TowerDef, spec: LevelSpec) {
   load(sim, def, spec);
   const n = pieces(sim).length;
   const traps: number[] = [];
+  const spills: number[] = [];
   const stuck: number[] = [];
   const secs: number[] = [];
   const map: string[] = [];
@@ -211,49 +261,67 @@ function survey(def: TowerDef, spec: LevelSpec) {
     const e = ps[i];
     const r = pull(sim, e, { center: towerCenter(sim) });
     if (r.stuck) stuck.push(i);
-    else if (r.topple) traps.push(i);
+    else if (r.crown) traps.push(i);
+    else if (r.fell) spills.push(i);
     if (r.out) secs.push(r.secs);
-    map.push(r.stuck ? 'S' : r.topple ? (r.out ? 'x' : 'X') : '.');
-    if (r.topple && process.env.WHY) console.log(`    trap #${i} (${e.type} len ${pieceLength(e).toFixed(1)} at y ${e.home.y.toFixed(2)}): ${r.culprit}`);
+    // . clean   s spill (other pieces fell, play goes on)   X a crown fell   S stuck
+    map.push(r.stuck ? 'S' : r.crown ? 'X' : r.fell ? 's' : '.');
+    if ((r.crown || r.fell) && process.env.WHY) console.log(`    #${i} (${e.type} len ${pieceLength(e).toFixed(1)} at y ${e.home.y.toFixed(2)}): ${r.crown ? 'crown fell' : `${r.fell} fell`}`);
   }
-  return { n, traps, stuck, map: map.join(''), pullSecs: secs.reduce((a, b) => a + b, 0) / Math.max(1, secs.length) };
+  return { n, traps, spills, stuck, map: map.join(''), pullSecs: secs.reduce((a, b) => a + b, 0) / Math.max(1, secs.length) };
 }
 
-/** Play until the tower topples. careful = number of candidates a careful bot tries per turn (0 = random bot). */
-function game(def: TowerDef, spec: LevelSpec, careful: number, maxTurns = 80) {
+/**
+ * Play one tower by the game's rules until a crown falls (or nothing is left): spills cost points but
+ * play goes on. careful = pieces a careful bot tries per turn before committing (0 = random bot).
+ */
+function game(def: TowerDef, spec: LevelSpec, careful: number, maxTurns = 120) {
   let sim = new Sim();
   let trial = new Sim();
   load(sim, def, spec);
   sim.settle(SETTLE);
   const center = towerCenter(sim);
   let turns = 0;
+  let spills = 0;
   while (turns < maxTurns) {
     const ps = pieces(sim);
-    if (!ps.length) break;
+    if (!ps.length) return { turns, spills, reason: 'cleared' };
     if (careful) {
+      // try up to `careful` pieces; take the first clean pull, else the smallest spill that keeps the crowns up
       const st = save(sim);
       const order = ps.map((_, i) => i).sort(() => rnd() - 0.5).slice(0, careful);
-      let found = false;
+      let pick = -1;
+      let pickFell = Infinity;
       for (const idx of order) {
         restore(trial, def, spec, st);
         const r = pull(trial, pieces(trial)[idx], { center });
-        if (r.out && !r.topple) {
-          found = true;
+        if (!r.out || r.crown) continue;
+        if (r.fell === 0) {
+          pick = idx;
+          pickFell = 0;
           break;
         }
+        if (r.fell < pickFell) {
+          pick = idx;
+          pickFell = r.fell;
+        }
       }
-      if (!found) return { turns, reason: 'no safe move' };
-      // the trial that held becomes the real tower
+      if (pick < 0) return { turns, spills, reason: 'every try dropped a crown' };
+      restore(trial, def, spec, st);
+      const r = pull(trial, pieces(trial)[pick], { center });
       [sim, trial] = [trial, sim];
       turns++;
+      if (r.fell) spills++;
+      if (r.crown) return { turns, spills, reason: 'crown' };
       continue;
     }
     const r = pull(sim, ps[Math.floor(rnd() * ps.length)], { center });
-    if (r.stuck) return { turns, reason: 'stuck' };
+    if (r.stuck) return { turns, spills, reason: 'stuck' };
     turns++;
-    if (r.topple) return { turns, reason: `topple (${r.culprit})` };
+    if (r.fell) spills++;
+    if (r.crown) return { turns, spills, reason: 'crown' };
   }
-  return { turns, reason: 'max turns' };
+  return { turns, spills, reason: 'max turns' };
 }
 
 async function main() {
@@ -265,7 +333,9 @@ async function main() {
   for (const def of pickTowers) {
     const spec = buildLevel(def, 1);
     const id = idle(def, spec);
-    const ok = !id.fell && id.drift < 0.1 && id.settleDrift < 0.02 * id.topY;
+    const stacking = stackingProblems(spec);
+    const ok = !id.fell && id.drift < 0.1 && id.settleDrift < 0.02 * id.topY && !stacking.length;
+    for (const m of stacking) console.log(`  STACKING: ${m}`);
     if (!ok) fail++;
     console.log(
       `\n#${ALL.indexOf(def) + 1} ${def.name} [${def.id}] pieces=${id.n} crowns=${id.crowns} top=${id.topY.toFixed(1)} ` +
@@ -273,23 +343,22 @@ async function main() {
     );
     if (!ok) continue;
     if (doSurvey) {
-      const s = survey(def, spec);
-      if (s.stuck.length) fail++;
-      console.log(`  survey: ${s.n - s.traps.length - s.stuck.length} safe, ${s.traps.length} traps (${((100 * s.traps.length) / s.n).toFixed(0)}%), ${s.stuck.length} stuck, avg pull ${s.pullSecs.toFixed(1)}s`);
-      console.log(`  map: ${s.map}`);
+      const sv = survey(def, spec);
+      if (sv.stuck.length) fail++;
+      console.log(
+        `  survey: ${sv.n - sv.traps.length - sv.spills.length - sv.stuck.length} clean, ${sv.spills.length} spills, ${sv.traps.length} drop a crown (${((100 * sv.traps.length) / sv.n).toFixed(0)}%), ${sv.stuck.length} stuck, avg pull ${sv.pullSecs.toFixed(1)}s`,
+      );
+      console.log(`  map: ${sv.map}`);
       if (slowSettles) console.log(`  still moving 8 s after ${slowSettles} pulls`);
       slowSettles = 0;
     }
-    if (nGames) {
-      const res = Array.from({ length: nGames }, () => game(def, spec, 0));
+    const report = (label: string, res: { turns: number; spills: number; reason: string }[]) => {
       const t = res.map((r) => r.turns).sort((a, b) => a - b);
-      console.log(`  random bot: pulls before topple median ${t[t.length >> 1]} (min ${t[0]}, max ${t[t.length - 1]}) [${t.join(' ')}]`);
-    }
-    if (nCareful) {
-      const res = Array.from({ length: nCareful }, () => game(def, spec, 10));
-      const t = res.map((r) => r.turns).sort((a, b) => a - b);
-      console.log(`  careful bot: median ${t[t.length >> 1]} (min ${t[0]}, max ${t[t.length - 1]}) [${res.map((r) => r.turns + ':' + r.reason).join(', ')}]`);
-    }
+      const sp = res.reduce((a, r) => a + r.spills, 0) / res.length;
+      console.log(`  ${label}: pulls until a crown falls: median ${t[t.length >> 1]} (min ${t[0]}, max ${t[t.length - 1]}), ${sp.toFixed(1)} spills a game [${res.map((r) => `${r.turns}${r.reason === 'crown' ? '' : ':' + r.reason}`).join(' ')}]`);
+    };
+    if (nGames) report('random bot', Array.from({ length: nGames }, () => game(def, spec, 0)));
+    if (nCareful) report('careful bot', Array.from({ length: nCareful }, () => game(def, spec, 10)));
   }
   if (fail) process.exitCode = 1;
 }

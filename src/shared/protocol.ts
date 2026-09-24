@@ -18,7 +18,7 @@ export interface ModeInfo {
 export const MODES: ModeInfo[] = [
   { id: 'blast', name: 'Blast Party', tagline: 'Everyone throws at once. Knock blocks off the stands to score!', turns: false, roundsLabel: 'levels' },
   { id: 'best', name: 'Best Shot', tagline: 'Take turns. 3 balls each on the same level — biggest topple wins.', turns: true, roundsLabel: 'rounds' },
-  { id: 'pull', name: 'Tower Pull', tagline: "Take turns pulling blocks out of the tower. Don't knock it over!", turns: true, roundsLabel: 'towers' },
+  { id: 'pull', name: 'Tower Pull', tagline: "Take turns pulling pieces out of the tower. Don't drop the crown!", turns: true, roundsLabel: 'towers' },
 ];
 
 export type ControlKind = 'throw' | 'grab' | 'none';

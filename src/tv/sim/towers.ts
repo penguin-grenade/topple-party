@@ -186,11 +186,11 @@ export const TOWERS: TowerDef[] = [
       let y = 1;
       for (let i = 0; i < 13; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i) });
       // gallery: extra-long pieces sticking out past the tower on every side
-      y = layer(b, y, { n: 3, len: span(6), ang: X });
-      y = layer(b, y, { n: 6, len: span(6), ang: Z, gold: [0] });
-      y = layer(b, y, { n: 6, len: span(6), ang: X });
+      y = layer(b, y, { n: 3, len: span(6), ang: Z });
+      y = layer(b, y, { n: 6, len: span(6), ang: X, gold: [0] });
+      y = layer(b, y, { n: 6, len: span(6), ang: Z });
       // lantern
-      for (let i = 0; i < 4; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1) });
+      for (let i = 0; i < 4; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i) });
       crown(b, 0, y, 0);
     },
   },
@@ -332,26 +332,6 @@ export const TOWERS: TowerDef[] = [
   },
   // -------------------------------------------------------------------------------- blueprints
   {
-    id: 'corkscrew',
-    name: 'Corkscrew',
-    blurb: 'Every layer turns and every layer shifts, so the whole tower winds up like a spring.',
-    modes: ['pull'],
-    substeps: 1,
-    build(b) {
-      b.plinth(0, 0, 5.6, 5.6, 1);
-      let y = 1;
-      const L = 26, r = 0.55;
-      let cx = 0, cz = 0;
-      for (let i = 0; i < L; i++) {
-        const orbit = (i * Math.PI) / 8;
-        cx = r * Math.cos(orbit);
-        cz = r * Math.sin(orbit);
-        y = layer(b, y, { n: 3, len: 3.4, ang: (i * Math.PI) / 4, cx, cz, gold: i === 9 ? [0] : i === 17 ? [2] : [] });
-      }
-      crown(b, cx, y, cz);
-    },
-  },
-  {
     id: 'buttress',
     name: 'Flying Buttress',
     blurb: 'A spire propped up by two buttresses that lean too far to stand alone. They hold each other up.',
@@ -377,6 +357,26 @@ export const TOWERS: TowerDef[] = [
     },
   },
   {
+    id: 'corkscrew',
+    name: 'Corkscrew',
+    blurb: 'Every layer turns and every layer shifts, so the whole tower winds up like a spring.',
+    modes: ['pull'],
+    substeps: 1,
+    build(b) {
+      b.plinth(0, 0, 5.6, 5.6, 1);
+      let y = 1;
+      const L = 26, r = 0.55;
+      let cx = 0, cz = 0;
+      for (let i = 0; i < L; i++) {
+        const orbit = (i * Math.PI) / 8;
+        cx = r * Math.cos(orbit);
+        cz = r * Math.sin(orbit);
+        y = layer(b, y, { n: 3, len: 3.4, ang: (i * Math.PI) / 4, cx, cz, gold: i === 9 ? [0] : i === 17 ? [2] : [] });
+      }
+      crown(b, cx, y, cz);
+    },
+  },
+  {
     id: 'pivot',
     name: 'Double Pivot',
     blurb: 'The top half balances on one piece, and the top of that on another. Keep it level.',
@@ -386,7 +386,7 @@ export const TOWERS: TowerDef[] = [
       b.plinth(0, 0, 5, 5, 1);
       let y = 1;
       for (let i = 0; i < 3; i++) y = layer(b, y, { n: 4, len: span(4), ang: alt(i) });
-      for (let i = 0; i < 8; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1) });
+      for (let i = 0; i < 7; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1) });
       // pivot 1: a single piece running along x, across the last layer...
       y = piece(b, 0, y, 0, 3, X);
       // ...under a wide deck that overhangs it both ways
@@ -404,7 +404,7 @@ export const TOWERS: TowerDef[] = [
   {
     id: 'corbel',
     name: 'Corbel Arch',
-    blurb: 'Two pillars step inward layer by layer until they meet. Heavy balconies keep them from tipping in.',
+    blurb: 'Two pillars step inward until they meet. Crowned balconies keep them from tipping in. Five crowns.',
     modes: ['pull'],
     substeps: 1,
     yaw: 12,
@@ -416,13 +416,15 @@ export const TOWERS: TowerDef[] = [
       let y = 1;
       for (let i = 0; i < 6; i++) {
         for (const s of [-1, 1]) {
-          if (i === 3) {
+          if (i === 4) {
             // balcony: the X layer pokes far out past the outside of the pillar...
             layer(b, y, { n: 3, len: REACH, ang: X, cx: s * (P - 1.5 + REACH / 2), gold: s > 0 ? [2] : [] });
-          } else if (i === 4) {
-            // ...and the Z layer above carries more pieces out on it, as counterweights
+          } else if (i === 5) {
+            // ...and the Z layer above carries more pieces out on it, as counterweights, with a crown
+            // perched on the far end
             layer(b, y, { n: 3, len: 3, ang: Z, cx: s * P });
-            fill(b, y, { ang: Z, from: s * (P + 1.54), to: s * (P - 1.4 + REACH), at: 0, len: 3 });
+            const tip = fill(b, y, { ang: Z, from: s * (P + 1.54), to: s * (P - 1.4 + REACH), at: 0, len: 3 });
+            crown(b, tip - s * 0.5, y + GAP + PIECE_H, 0, 0.7);
           } else layer(b, y, { n: 3, len: 3, ang: alt(i), cx: s * P });
         }
         y += GAP + PIECE_H;
@@ -488,7 +490,7 @@ export const TOWERS: TowerDef[] = [
   {
     id: 'j78d',
     name: 'J-78-D',
-    blurb: 'Arches, a flying buttress, balconies and three spires, one on a single-piece pivot. Stability: 24%.',
+    blurb: 'Arches, a buttress, a crowned balcony and three spires, one on a single-piece pivot. Stability: 24%.',
     modes: ['pull'],
     substeps: 1,
     yaw: 10,
@@ -527,8 +529,11 @@ export const TOWERS: TowerDef[] = [
           if (ang === X) layer(b, y, { n: 3, len: out - inner, ang: X, cx: (s * (out + inner)) / 2 });
           else fill(b, y, { ang: Z, from: s * inner, to: s * out, at: 0, len: 3 });
         }
-        // weights standing out on each balcony
-        if (BALCONY.includes(i - 1)) fill(b, y, { ang: Z, from: -(xo + 0.04), to: -(xo + 2.2), at: 0, len: 3 });
+        // weights standing out on each balcony, and a crown on the upper one
+        if (BALCONY.includes(i - 1)) {
+          const tip = fill(b, y, { ang: Z, from: -(xo + 0.04), to: -(xo + 2.2), at: 0, len: 3 });
+          if (i - 1 === 14) crown(b, tip + 0.5, y + H, 0, 0.7);
+        }
       }
       // three spires on the top lintel; the middle one balances on a single pivot piece
       let sy = y;

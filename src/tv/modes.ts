@@ -3,7 +3,7 @@ import type { Game, Player } from './game';
 import { BLOCK_TYPES, isPrize, type BlockType } from './sim/blocks';
 import { buildLevel, levelsFor, PRACTICE, type LevelDef } from './sim/levels';
 import { TOWERS, TOWER_CONTACT_HZ, frameTower, type TowerDef } from './sim/towers';
-import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, pullReach, toppled } from './sim/pull';
+import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, pullReach, snapshotOf, fallenPieces, fallenCrown, spillPenalty, type Pose } from './sim/pull';
 import * as THREE from 'three';
 import { pos, type Entity, type SimEvent, type V3 } from './sim/sim';
 
@@ -379,9 +379,12 @@ export class PullMode extends Mode {
   private def: TowerDef = TOWERS[0];
   private turnCount = 0;
   private active: Player | null = null;
-  private phase: 'build' | 'intro' | 'turn' | 'check' | 'toppled' = 'build';
+  private phase: 'build' | 'intro' | 'turn' | 'check' | 'result' | 'toppled' = 'build';
   private t = 0;
-  private snapshot = new Map<Entity, V3>();
+  /** how long the result of a turn stays up before the next turn */
+  private resultFor = 0;
+  /** where everything was when the turn started: a piece has fallen if it dropped or tipped since */
+  private snapshot = new Map<Entity, Pose>();
   private grabbed: Entity | null = null;
   private grabAxis: V3 = { x: 1, y: 0, z: 0 };
   /** camera basis frozen at grab time: horizontal "toward the viewer" and "screen right" */
@@ -389,10 +392,21 @@ export class PullMode extends Mode {
   private grabRight: V3 = { x: 1, y: 0, z: 0 };
   private hover: Entity | null = null;
   private checkMsg = '';
+  private endMsg = '';
   private creakT = 0;
   /** height range of the tower's pieces when built (lower pieces are worth more) */
   private lowY = 0;
   private highY = 1;
+  // ---- this turn
+  /** the piece the player last took hold of (if it tips out on its own, that's their pull) */
+  private handled: Entity | null = null;
+  /** points for the piece that came out, paid once the tower settles without anything else falling */
+  private pending = 0;
+  private pendingAt: V3 = { x: 0, y: 5, z: 0 };
+  /** other pieces knocked down this turn, waiting to be cleared away (they can't be grabbed) */
+  private rubble = new Set<Entity>();
+  private fell = 0;
+  private clears = 0;
 
   start() {
     this.game.renderer.camRate = 7; // snappy: the active player steers it
@@ -418,6 +432,7 @@ export class PullMode extends Mode {
     this.phase = 'build';
     this.t = 0;
     this.grabbed = null;
+    this.rubble.clear();
     g.hud.banner(`Tower ${this.tower + 1} of ${g.rounds}: ${this.def.name}`, this.def.blurb, '#ffd23f', 3500);
     g.pushViews();
   }
@@ -433,7 +448,12 @@ export class PullMode extends Mode {
     this.phase = 'intro';
     this.t = 0;
     this.grabbed = null;
+    this.handled = null;
     this.hover = null;
+    this.pending = 0;
+    this.fell = 0;
+    this.clears = 0;
+    this.rubble.clear();
     g.renderer.setOutline(null);
     // each turn starts at the default height/zoom, looking from wherever the last player left the camera
     g.renderer.lift = 0;
@@ -443,11 +463,7 @@ export class PullMode extends Mode {
     g.pushViews();
   }
   private takeSnapshot() {
-    this.snapshot.clear();
-    for (const e of this.game.sim.blocks()) this.snapshot.set(e, pos(e));
-  }
-  private collapsed(): boolean {
-    return !!toppled(this.snapshot, this.grabbed);
+    this.snapshot = snapshotOf(this.game.sim.blocks());
   }
   private movement(): number {
     let m = 0;
@@ -462,6 +478,37 @@ export class PullMode extends Mode {
   pieceValue(e: Entity): number {
     const depth = (this.highY - e.home.y) / (this.highY - this.lowY);
     return 5 + Math.round(13 * Math.max(0, Math.min(1, depth))) + (pieceLength(e) >= 5 ? 3 : 0) + (e.type === 'jgold' ? 15 : 0);
+  }
+  /** Pieces the active player may grab: still in the tower, not knocked down this turn. */
+  private grabbable(e: Entity | null | undefined): e is Entity {
+    return !!e && isPiece(e) && !this.rubble.has(e);
+  }
+  /**
+   * Watch for falls. A crown coming down ends the tower. Any other piece that drops or tips over is
+   * rubble, except the player's own piece tipping out, which counts as pulling it.
+   */
+  private watchFalls(): boolean {
+    if (fallenCrown(this.snapshot)) {
+      this.topple();
+      return true;
+    }
+    for (const e of fallenPieces(this.snapshot, this.rubble)) {
+      if (this.phase === 'turn' && e === this.handled) {
+        this.pulledOut(e);
+        continue;
+      }
+      if (this.grabbed === e) this.release();
+      this.rubble.add(e);
+      if (this.hover === e) {
+        this.hover = null;
+        this.game.renderer.setOutline(null);
+      }
+      if (this.rubble.size === 1) {
+        this.game.sfx.creak();
+        this.game.pushViews();
+      }
+    }
+    return false;
   }
 
   update(dt: number) {
@@ -481,7 +528,7 @@ export class PullMode extends Mode {
         }
         break;
       case 'turn': {
-        // No time limit: the turn only ends when a block comes all the way out (or the tower falls).
+        // No time limit: the turn only ends when a piece comes all the way out (or a crown falls).
         this.updateHover();
         if (this.grabbed && !this.grabbed.gone) {
           const e = this.grabbed;
@@ -494,13 +541,20 @@ export class PullMode extends Mode {
           }
           if (Math.abs(out) > outThreshold(e)) this.pulledOut(e);
         }
-        if (this.collapsed()) this.topple();
+        if (this.phase === 'turn') this.watchFalls();
         break;
       }
       case 'check':
-        if (this.collapsed()) this.topple();
+        if (this.watchFalls()) break;
         // wait for the tower to settle (but never forever: a big tower can keep trembling)
-        else if (this.t > 2.4 && (this.movement() < 0.2 || this.t > 9)) this.nextTurn();
+        if (this.t > 2.4 && (this.movement() < 0.2 || this.t > 9)) {
+          if (this.rubble.size && this.clears < 5) this.clearRubble();
+          else this.resolveTurn();
+        }
+        break;
+      case 'result':
+        if (fallenCrown(this.snapshot)) this.topple();
+        else if (this.t > this.resultFor) this.nextTurn();
         break;
       case 'toppled':
         if (this.t > 4.8) {
@@ -514,11 +568,59 @@ export class PullMode extends Mode {
     }
   }
 
+  /** Sweep away what fell, then let the tower settle again (clearing it can shift what's left). */
+  private clearRubble() {
+    const g = this.game;
+    for (const e of this.rubble) {
+      if (!e.gone) {
+        g.renderer.fx.poof(pos(e), '#f4d29b', 6);
+        g.sim.remove(e);
+      }
+      this.snapshot.delete(e);
+      this.fell++;
+    }
+    this.rubble.clear();
+    this.clears++;
+    g.sfx.pop();
+    this.t = 1.2;
+  }
+
+  private resolveTurn() {
+    const g = this.game;
+    const a = this.active;
+    this.resultFor = 0.8;
+    if (a && this.fell > 0) {
+      const pen = spillPenalty(this.fell);
+      g.award(a, -pen, this.pendingAt);
+      const what = `${this.fell} piece${this.fell > 1 ? 's' : ''} fell`;
+      g.hud.banner('SPILL!', `<span style="color:${a.color}">${a.name}</span>: ${what} (−${pen}). The tower stands, so play on!`, '#ff9f43', 2600);
+      g.sfx.sad();
+      g.buzz(a, [120, 60, 120]);
+      this.checkMsg = `Spill! −${pen}`;
+      this.resultFor = 2.6;
+    } else if (a && this.pending) {
+      g.award(a, this.pending, this.pendingAt);
+      this.checkMsg = `Nice! +${this.pending}`;
+    }
+    // nothing left to pull? then this tower is done
+    if (!g.sim.blocks().some((e) => isPiece(e))) {
+      this.endMsg = 'Tower cleared!';
+      g.hud.banner('TOWER CLEARED!', 'Every piece is out and the crown never fell.', '#33c46a', 4200);
+      this.phase = 'toppled';
+      this.t = 0;
+      g.pushViews();
+      return;
+    }
+    this.phase = 'result';
+    this.t = 0;
+    g.pushViews();
+  }
+
   private updateHover() {
     const a = this.active;
     if (!a || this.grabbed) return;
     const hit = this.game.pick(a.aimShown.x, a.aimShown.y);
-    const e = hit?.ent && isPiece(hit.ent) ? hit.ent : null;
+    const e = this.grabbable(hit?.ent) ? hit!.ent : null;
     if (e !== this.hover) {
       this.hover = e;
       this.game.renderer.setOutline(e, '#ffffff');
@@ -528,17 +630,19 @@ export class PullMode extends Mode {
   private pulledOut(e: Entity) {
     const g = this.game;
     const a = this.active!;
-    const pts = this.pieceValue(e);
-    g.sim.grabEnd();
+    this.pending = this.pieceValue(e);
+    if (this.grabbed === e) g.sim.grabEnd();
     const p = pos(e);
+    this.pendingAt = p;
     g.renderer.fx.poof(p, e.type === 'jgold' ? '#ffd23f' : '#f4d29b', 10);
     g.renderer.fx.sparkle(p, a.color, 16);
     g.sim.remove(e);
+    this.snapshot.delete(e);
     g.renderer.setOutline(null);
     this.grabbed = null;
+    this.handled = null;
     g.sfx.pop();
-    g.award(a, pts, p);
-    this.checkMsg = `+${pts}`;
+    this.checkMsg = `Out! +${this.pending} if nothing else falls`;
     this.phase = 'check';
     this.t = 0;
     g.pushViews();
@@ -549,13 +653,14 @@ export class PullMode extends Mode {
     const a = this.active;
     this.release();
     this.phase = 'toppled';
+    this.endMsg = '';
     this.t = 0;
     g.renderer.setOutline(null);
     g.sfx.sad();
     g.renderer.fx.shake = 0.5;
     if (a) {
       g.award(a, -15, { x: 0, y: 6, z: 0 });
-      g.hud.banner('TOPPLED!', `<span style="color:${a.color}">${a.name}</span> knocked it over (−15)`, '#ff5a6e', 4200);
+      g.hud.banner('TOPPLED!', `<span style="color:${a.color}">${a.name}</span> brought a crown down (−15)`, '#ff5a6e', 4200);
       g.buzz(a, [300, 100, 300]);
     }
     g.pushViews();
@@ -563,8 +668,6 @@ export class PullMode extends Mode {
 
   private release() {
     if (this.grabbed) {
-      // the block the player was handling may stick out now; that's not a collapse
-      if (!this.grabbed.gone) this.snapshot.set(this.grabbed, pos(this.grabbed));
       this.game.sim.grabEnd();
       this.grabbed = null;
     }
@@ -577,7 +680,7 @@ export class PullMode extends Mode {
     p.aim = { x, y };
     const hit = g.pick(x, y);
     const e = hit?.ent;
-    if (!e || !isPiece(e)) {
+    if (!this.grabbable(e)) {
       g.buzz(p, [20, 40, 20]);
       return;
     }
@@ -592,6 +695,7 @@ export class PullMode extends Mode {
     this.grabRight = { x: -fz, y: 0, z: fx };
     g.sim.grabStart(e, this.grabAxis);
     this.grabbed = e;
+    this.handled = e;
     this.hover = null;
     g.renderer.setOutline(e, p.color, true);
     g.buzz(p, 35);
@@ -630,12 +734,16 @@ export class PullMode extends Mode {
   }
   view(p: Player): PadPart {
     const a = this.active;
-    if (this.phase === 'toppled') return { screen: 'wait', control: 'none', title: 'TOPPLED!', sub: a ? `${a.name} knocked it over` : '' };
+    if (this.phase === 'toppled') {
+      if (this.endMsg) return { screen: 'wait', control: 'none', title: this.endMsg, sub: 'On to the next one…' };
+      return { screen: 'wait', control: 'none', title: 'TOPPLED!', sub: a ? `${a.name} brought a crown down` : '' };
+    }
     if (this.phase === 'build') return { screen: 'wait', control: 'none', title: 'New tower!', sub: 'Get ready…' };
     if (p === a) {
-      if (this.phase === 'turn') return { screen: 'play', control: 'grab', title: 'Your turn!', sub: 'Pull one block all the way out', camera: true };
+      if (this.phase === 'turn')
+        return { screen: 'play', control: 'grab', title: this.rubble.size ? 'Pieces are falling!' : 'Your turn!', sub: this.rubble.size ? 'Get your piece out anyway' : 'Pull one piece all the way out', camera: true };
       if (this.phase === 'intro') return { screen: 'wait', control: 'none', title: 'Your turn next!', sub: 'Point at the TV', camera: true };
-      return { screen: 'wait', control: 'none', title: this.checkMsg || 'Nice!', sub: 'Waiting for the tower to settle…' };
+      return { screen: 'wait', control: 'none', title: this.checkMsg || 'Nice!', sub: this.phase === 'result' ? (this.fell ? 'Pieces fell, but the crown held' : 'Clean pull!') : 'Waiting for the tower to settle…' };
     }
     return { screen: 'wait', control: 'none', title: a ? `${a.name}'s turn` : 'Get ready', sub: 'Hold your breath…' };
   }
@@ -646,7 +754,7 @@ export class PullMode extends Mode {
     return {
       left,
       center: `<span style="color:${a.color}">${a.name}</span>`,
-      sub: this.phase === 'turn' ? 'must pull a block out' : '',
+      sub: this.phase === 'turn' ? 'must pull a piece out' : this.phase === 'check' ? 'settling…' : '',
     };
   }
 }

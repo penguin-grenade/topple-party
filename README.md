@@ -17,7 +17,7 @@ of a wobbly tower without toppling it.
 | --- | --- | --- |
 | **Blast Party** | Everyone at once | Timed levels. Knock blocks off their stands; whoever's ball knocked it gets the points. Gold = 10, Gem = 25, Skull = −10. |
 | **Best Shot** | Take turns | Everyone gets 3 balls on an identical copy of the level. Biggest topple wins the round. |
-| **Tower Pull** | Take turns | Jenga-style, on sixteen towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. Deeper pieces score more, long pieces +3, **gold** pieces +15. Topple it (or drop a crown) and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
+| **Tower Pull** | Take turns | Jenga-style, on sixteen towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. If only your piece comes out, it scores: deeper pieces score more, long pieces +3, **gold** pieces +15. If other pieces fall too, that's a **spill**: no points, −5 for each piece that fell (−15 at most), the fallen pieces are cleared away and play goes on. Pieces that just slide or get nudged don't count. The tower only ends when a **crown** falls (−15 for whoever dropped it). On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
 
 Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explode when two touch),
 **ghost** blocks (vanish when hit), **ice** (slippery), **stone** (heavy).
@@ -41,16 +41,17 @@ towers 4, 5 and 6.
 | 8 | **The Gate** | Two skinny legs that only stand because the long bridges tie them together. |
 | 9 | **The Arch** | Two towers leaning so far in that neither could stand alone. Watch their feet. |
 | 10 | **The Colossus** | 115 pieces, 22 high: wide foundation, see-through window, a neck leaning out, a balcony with a second crown, and a twisted spire leaning back. |
-| 11 | **Corkscrew** | Every layer turns 45° and shifts, so the whole tower winds up like a spring. |
-| 12 | **Flying Buttress** | A spire propped up by two buttresses that lean too far to stand alone, tied into the spire at the top. |
+| 11 | **Flying Buttress** | A spire propped up by two buttresses that lean too far to stand alone, tied into the spire at the top. |
+| 12 | **Corkscrew** | Every layer turns 45° and shifts, so the whole tower winds up like a spring. |
 | 13 | **Double Pivot** | The top half balances on one piece, and the top of that on another, turned 90°. |
-| 14 | **Corbel Arch** | Two pillars step inward layer by layer until they meet overhead; heavy balconies keep them from tipping in. Three crowns. |
+| 14 | **Corbel Arch** | Two pillars step inward layer by layer until they meet overhead; long balconies keep them from tipping in. Five crowns, two of them out on the balconies. |
 | 15 | **The Trident** | A hollow frame where every piece is load-bearing, a wide deck, and three spires tied by bridges. Three crowns. |
-| 16 | **J-78-D** | 200 pieces: two corbelled arches, a diagonal truss buttress, cantilevered balconies, and three spires, the middle one on a single-piece pivot. |
+| 16 | **J-78-D** | 200 pieces: two corbelled arches, a diagonal truss buttress, cantilevered balconies, and three spires, the middle one on a single-piece pivot. Four crowns. |
 
-Each tower was tuned headlessly: it has to stand on its own, every piece has to slide out, and
-bot playtests check the difficulty climbs. A careless player (random pieces) topples Classic after
-about 8 pulls and the Colossus after about 3; a careful one lasts roughly 12–30 pulls on any of them.
+Each tower was tuned headlessly: it has to stand on its own, every piece has to slide out, no piece
+may rest on a single piece running the same way (pulling that one would drop it), and bot playtests
+check how long each lasts. A careless player (random pieces) drops a crown after about 8 pulls on
+Classic and about 3 on The Trident; a careful one lasts roughly 8–30 pulls on any of them.
 
 ## Controls (phone)
 
