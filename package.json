@@ -1,0 +1,29 @@
+{
+  "name": "topple-party",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Boom Blox-style party game for Android TV. Phones are the motion controllers.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "dev:https": "vite --host --mode https",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit",
+    "signal": "peerjs --port 9000 --path /",
+    "test:physics": "tsx tests/physics-check.ts && tsx tests/jenga-check.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "peerjs": "^1.5.5",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-basic-ssl": "^2.0.0",
+    "peer": "^1.0.2",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "tsx": "^4.20.0"
+  }
+}

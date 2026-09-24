@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1b1238" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Topple Party · Controller</title>
+<link rel="icon" href="/icon.svg" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --me: #ffc93c;
+    --bg1: #1b1238;
+    --bg2: #33206e;
+    --ink: #fff;
+    --muted: #c9c0ef;
+    font-family: 'Fredoka', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none;
+    background: radial-gradient(120% 80% at 50% 0%, var(--bg2), var(--bg1) 70%);
+    color: var(--ink); user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom)); }
+
+  /* ---------- join ---------- */
+  #join { align-items: center; justify-content: center; gap: 14px; text-align: center; }
+  .logo { font-weight: 700; font-size: 52px; line-height: .9; letter-spacing: 1px; color: #fff;
+    text-shadow: 0 4px 0 #1b1238, 0 0 24px #a66cff88; margin-bottom: 10px; transform: rotate(-3deg); }
+  .logo span { color: #ffd23f; }
+  #join label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; color: var(--muted); width: min(320px, 90vw); text-align: left; }
+  #join input { font: inherit; font-size: 26px; font-weight: 700; padding: 12px 16px; border-radius: 16px; border: 3px solid #ffffff22;
+    background: #0004; color: #fff; outline: none; width: 100%; }
+  #join input:focus { border-color: #ffd23f; }
+  #code { letter-spacing: 10px; text-transform: uppercase; text-align: center; }
+  #joinBtn { margin-top: 8px; width: min(320px, 90vw); font-size: 30px; font-weight: 700; padding: 16px; border: 0; border-radius: 999px;
+    background: #ffd23f; color: #2a1650; box-shadow: 0 6px 0 #b8860b; }
+  #joinBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8860b; }
+  #joinBtn:disabled { opacity: .4; }
+  .hint { color: var(--muted); font-size: 15px; max-width: 320px; line-height: 1.35; margin: 4px 0 0; }
+  .err { color: #ff8fa3; font-weight: 600; min-height: 1.2em; margin: 0; }
+
+  /* ---------- pad ---------- */
+  #pad { gap: 10px; background: radial-gradient(90% 50% at 50% 100%, color-mix(in srgb, var(--me) 28%, transparent), transparent); }
+  header { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; }
+  #swatch { width: 26px; height: 26px; border-radius: 8px; background: var(--me); box-shadow: 0 0 0 3px #fff3; flex: none; }
+  #pname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pscore { background: #0005; padding: 4px 12px; border-radius: 999px; font-size: 18px; }
+  #status { text-align: center; min-height: 84px; }
+  #title { margin: 6px 0 2px; font-size: 28px; line-height: 1.1; }
+  #sub { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.3; }
+  #ammo { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+  #ammo .ball { width: 18px; height: 18px; border-radius: 50%; background: var(--me); box-shadow: inset -3px -3px 0 #0003, 0 0 0 2px #fff6; }
+  #ammo .ball.used { background: #fff2; box-shadow: 0 0 0 2px #fff2; }
+
+  #hostPanel { display: flex; flex-direction: column; gap: 10px; background: #0003; border-radius: 20px; padding: 12px; }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mode { border: 3px solid #ffffff22; background: #ffffff10; border-radius: 14px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .mode b { font-size: 16px; }
+  .mode small { font-size: 12px; color: var(--muted); }
+  .mode.sel { border-color: #ffd23f; background: #ffd23f22; }
+  .rounds { display: flex; align-items: center; justify-content: center; gap: 14px; font-weight: 600; font-size: 18px; }
+  .rounds button { width: 46px; height: 46px; border-radius: 50%; border: 0; background: #ffffff1c; font-size: 26px; font-weight: 700; }
+  .start, .hbtn { border: 0; border-radius: 999px; padding: 14px; font-size: 22px; font-weight: 700; background: #ffffff1c; }
+  .start { background: #33c46a; box-shadow: 0 5px 0 #1f8546; }
+  .start:active { transform: translateY(3px); box-shadow: 0 2px 0 #1f8546; }
+
+  #touchpad { flex: 1; min-height: 120px; border-radius: 20px; border: 3px dashed #ffffff33; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-weight: 600; touch-action: none; position: relative; }
+  .spacer { flex: 1; }
+
+  #actionWrap { position: relative; display: flex; justify-content: center; align-items: center; padding: 8px 0; }
+  #action { position: relative; width: min(62vw, 34vh); height: min(62vw, 34vh); border-radius: 50%; border: 6px solid #fff;
+    background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--me) 70%, #fff), var(--me) 55%, color-mix(in srgb, var(--me) 70%, #000));
+    box-shadow: 0 10px 0 color-mix(in srgb, var(--me) 55%, #000), 0 0 40px color-mix(in srgb, var(--me) 50%, transparent);
+    touch-action: none; transition: transform .08s, filter .2s, opacity .2s; }
+  #action.down { transform: translateY(6px) scale(.97); box-shadow: 0 4px 0 color-mix(in srgb, var(--me) 55%, #000), 0 0 60px var(--me); }
+  #action.cool { filter: saturate(.3) brightness(.8); }
+  #action:disabled { filter: grayscale(1) brightness(.6); opacity: .6; }
+  #action.thrown { animation: thrown .45s ease-out; }
+  @keyframes thrown { 0% { transform: scale(.9); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  #actionLabel { font-size: clamp(28px, 10vw, 52px); font-weight: 700; color: #fff; text-shadow: 0 3px 0 #0005; pointer-events: none; }
+  #ring { position: absolute; inset: -14px; border-radius: 50%; pointer-events: none; --c: 0;
+    background: conic-gradient(#fff calc(var(--c) * 360deg), transparent 0);
+    -webkit-mask: radial-gradient(circle, transparent 64%, #000 65%); mask: radial-gradient(circle, transparent 64%, #000 65%); opacity: .9; }
+  #power { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-weight: 700; font-size: 20px; opacity: 0; transition: opacity .2s;
+    background: #0008; padding: 4px 14px; border-radius: 999px; --p: 0; }
+  #power.show { opacity: 1; }
+  #power::before { content: 'POWER '; }
+  #power::after { content: ''; display: inline-block; vertical-align: middle; margin-left: 6px; width: 80px; height: 10px; border-radius: 5px;
+    background: linear-gradient(90deg, #ffd23f calc(var(--p) * 100%), #fff3 0); }
+  #hint { text-align: center; color: var(--muted); font-size: 15px; min-height: 2.6em; margin: 0; line-height: 1.3; }
+
+  .tools { display: flex; gap: 10px; justify-content: center; align-items: center; }
+  .tools button { border: 0; background: #ffffff18; border-radius: 999px; padding: 10px 16px; font-weight: 600; font-size: 16px; }
+  #aimViz { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #ffffff44; position: relative; overflow: hidden; flex: none; }
+  #aimDot { position: absolute; left: 13px; top: 13px; width: 8px; height: 8px; border-radius: 50%; background: var(--me); }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; background: #120b2bee; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; text-align: center; z-index: 10; }
+  .overlay h2 { margin: 0; font-size: 30px; }
+  .overlay p { margin: 0; color: var(--muted); font-size: 17px; max-width: 340px; line-height: 1.4; }
+  .spinner { width: 54px; height: 54px; border-radius: 50%; border: 6px solid #fff3; border-top-color: #ffd23f; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .phone-art { font-size: 70px; line-height: 1; transform: rotate(-60deg); }
+  .bigbtn { border: 0; border-radius: 999px; padding: 16px 30px; font-size: 24px; font-weight: 700; background: #ffd23f; color: #2a1650; box-shadow: 0 6px 0 #b8860b; }
+  #settings .row { display: flex; flex-direction: column; gap: 8px; width: min(320px, 90vw); text-align: left; font-weight: 600; }
+  #settings select, #settings input[type=range], #settings input:not([type]) { width: 100%; font: inherit; font-size: 18px; }
+  #settings input:not([type]) { padding: 8px 12px; border-radius: 10px; background: #0004; color: #fff; border: 2px solid #fff3; font-weight: 600; }
+  #settings select { padding: 8px; border-radius: 10px; background: #0004; color: #fff; border: 2px solid #fff3; }
+  #toast { position: fixed; left: 50%; top: calc(max(14px, env(safe-area-inset-top)) + 46px); transform: translate(-50%, -20px); background: #000d; padding: 10px 16px;
+    border-radius: 14px; font-weight: 600; font-size: 15px; opacity: 0; transition: all .25s; z-index: 20; width: max-content; max-width: 90vw; text-align: center;
+    pointer-events: none; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+  <section id="join" class="screen">
+    <div class="logo">TOPPLE<br /><span>PARTY</span></div>
+    <label>Room code<input id="code" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="4" placeholder="ABCD" /></label>
+    <label>Your name<input id="name" autocomplete="nickname" maxlength="14" /></label>
+    <button id="joinBtn">JOIN</button>
+    <p class="err" id="joinErr"></p>
+    <p class="hint">Hold your phone like a TV remote with the top edge pointing at the TV. Your phone is the controller!</p>
+  </section>
+
+  <section id="pad" class="screen hidden">
+    <header><span id="swatch"></span><span id="pname">Player</span><span id="pscore">0 pts</span></header>
+    <div id="status"><h1 id="title">Hi!</h1><p id="sub"></p><div id="ammo"></div></div>
+    <div id="hostPanel" class="hidden"></div>
+    <div id="touchpad" class="hidden">Drag here to aim</div>
+    <div class="spacer"></div>
+    <div id="actionWrap">
+      <div id="power"></div>
+      <button id="action" data-kind="none"><div id="ring"></div><span id="actionLabel">WAIT</span></button>
+    </div>
+    <p id="hint"></p>
+    <div class="tools">
+      <div id="aimViz" title="where you're aiming"><div id="aimDot"></div></div>
+      <button id="recenter">◎ Re-center</button>
+      <button id="pauseBtn" class="hidden">❚❚</button>
+      <button id="settingsBtn">⚙</button>
+    </div>
+  </section>
+
+  <section id="calib" class="overlay hidden">
+    <div class="phone-art">📱</div>
+    <h2>Point at the TV</h2>
+    <p>Hold your phone like a remote, aim the top edge at the <b>middle of the TV</b>, then tap the button.</p>
+    <button id="calibBtn" class="bigbtn">I'm pointing at it!</button>
+    <p style="font-size:14px">You can re-center any time with ◎.</p>
+  </section>
+
+  <section id="settings" class="overlay hidden">
+    <h2>Settings</h2>
+    <div class="row">Aiming
+      <select id="aimMode"><option value="motion">Motion (point your phone)</option><option value="touch">Touch pad (drag to aim)</option></select>
+    </div>
+    <div class="row">Sensitivity<input id="sens" type="range" min="0.5" max="2" step="0.1" /></div>
+    <div class="row">Your name<input id="renameIn" maxlength="14" autocomplete="nickname" /></div>
+    <button id="leaveBtn" class="hbtn">Leave game</button>
+    <button id="settingsClose" class="bigbtn">Done</button>
+  </section>
+
+  <section id="overlay" class="overlay hidden">
+    <div class="spinner"></div>
+    <h2 id="overlayText">Connecting…</h2>
+    <p id="overlaySub"></p>
+  </section>
+  <div id="toast"></div>
+
+  <script type="module" src="/src/controller/main.ts"></script>
+</body>
+</html>
