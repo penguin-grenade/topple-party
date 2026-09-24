@@ -45,16 +45,14 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: 11076708
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+          yes | sdkmanager --licenses >/dev/null
++          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install \
+             "platform-tools" \
+             "platforms;android-35" \
+             "build-tools;35.0.0"
 
       - name: Build the Android TV app (points at the Pages URL)
         env:
