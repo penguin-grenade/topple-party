@@ -143,9 +143,9 @@ export const LEVELS: LevelDef[] = [
     },
   },
   {
-    id: 'twin',
-    name: 'Twin Towers',
-    blurb: 'Knock out a tower and the bridge treasure falls.',
+    id: 'bridge',
+    name: 'Treasure Bridge',
+    blurb: 'Knock out a pillar and the treasure on the bridge falls.',
     modes: ['blast', 'best'],
     build(b) {
       b.plinth(-3.6, 0, 2.8, 1.7, 2);
