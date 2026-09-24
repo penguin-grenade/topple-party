@@ -17,7 +17,7 @@ of a wobbly tower without toppling it.
 | --- | --- | --- |
 | **Blast Party** | Everyone at once | Timed levels. Knock blocks off their stands; whoever's ball knocked it gets the points. Gold = 10, Gem = 25, Skull = −10. |
 | **Best Shot** | Take turns | Everyone gets 3 balls on an identical copy of the level. Biggest topple wins the round. |
-| **Tower Pull** | Take turns | Jenga-style, on ten towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. Deeper pieces score more, long pieces +3, **gold** pieces +15. Topple it (or drop a crown) and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
+| **Tower Pull** | Take turns | Jenga-style, on sixteen towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. Deeper pieces score more, long pieces +3, **gold** pieces +15. Topple it (or drop a crown) and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
 
 Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explode when two touch),
 **ghost** blocks (vanish when hit), **ice** (slippery), **stone** (heavy).
@@ -25,6 +25,7 @@ Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explod
 ### The towers
 
 In the lobby, Tower Pull shows a **Start at tower** picker (TV remote ◀ ▶, or the host's phone).
+Towers 11–16 are the blueprint set: much more complicated structures, for groups who've mastered the first ten.
 A game plays one tower per round, climbing from the one you pick: "3 towers" from tower 4 plays
 towers 4, 5 and 6.
 
@@ -40,6 +41,12 @@ towers 4, 5 and 6.
 | 8 | **The Gate** | Two skinny legs that only stand because the long bridges tie them together. |
 | 9 | **The Arch** | Two towers leaning so far in that neither could stand alone. Watch their feet. |
 | 10 | **The Colossus** | 115 pieces, 22 high: wide foundation, see-through window, a neck leaning out, a balcony with a second crown, and a twisted spire leaning back. |
+| 11 | **Corkscrew** | Every layer turns 45° and shifts, so the whole tower winds up like a spring. |
+| 12 | **Flying Buttress** | A spire propped up by two buttresses that lean too far to stand alone, tied into the spire at the top. |
+| 13 | **Double Pivot** | The top half balances on one piece, and the top of that on another, turned 90°. |
+| 14 | **Corbel Arch** | Two pillars step inward layer by layer until they meet overhead; heavy balconies keep them from tipping in. Three crowns. |
+| 15 | **The Trident** | A hollow frame where every piece is load-bearing, a wide deck, and three spires tied by bridges. Three crowns. |
+| 16 | **J-78-D** | 200 pieces: two corbelled arches, a diagonal truss buttress, cantilevered balconies, and three spires, the middle one on a single-piece pivot. |
 
 Each tower was tuned headlessly: it has to stand on its own, every piece has to slide out, and
 bot playtests check the difficulty climbs. A careless player (random pieces) topples Classic after
@@ -154,7 +161,8 @@ npm run dev          # http://localhost:5173
   TV GPUs smooth.
 * `npm run build` type-checks and outputs the static site to `dist/`.
 * `npm run test:physics` runs headless physics checks: every level must stand still when untouched,
-  sample throws, and every Tower Pull tower must stand on its own with every piece able to slide out.
+  sample throws, and every Tower Pull tower must stand on its own with every piece able to slide out
+  (about 10 minutes, most of it pulling every piece of every tower).
 * `npm run test:towers` adds bot playtests of each tower (slow: around 20 minutes). `tests/towers-check.ts`
   is a small tower lab: pass tower ids or numbers, `--survey` (which first pulls topple it),
   `--games N` (random-pull bots), `--careful N` (bots that test before they pull). Try new designs
@@ -168,7 +176,7 @@ p/index.html          phone controller page
 src/shared/           protocol, networking (PeerJS / BroadcastChannel), QR encoder
 src/controller/       phone: motion.ts (pointer + flick detection), main.ts (UI)
 src/tv/sim/           physics (Rapier): blocks, levels, explosions, scoring, Tower Pull grab
-src/tv/sim/towers.ts  the ten Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
+src/tv/sim/towers.ts  the sixteen Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
 src/tv/render/        three.js scene, procedural textures, particles
 src/tv/game.ts        players, lobby, networking glue, TV remote input
 src/tv/modes.ts       Practice, Blast Party, Best Shot, Tower Pull
@@ -181,7 +189,8 @@ Adding a level: add an entry to `LEVELS` in `src/tv/sim/levels.ts`. Builders lik
 stand's top scores.
 
 Adding a tower: add an entry to `TOWERS` in `src/tv/sim/towers.ts`. `layer(b, y, { n, len, ang, cx, cz, skip, gold })`
-lays `n` pieces of length `len` side by side, running along `ang` (any angle), and returns the top.
+lays `n` pieces of length `len` side by side, running along `ang` (any angle), and returns the top;
+`piece()` places a single piece and `fill()` packs pieces across a span (handy for corbels).
 The camera frames each tower automatically. Run `tsx tests/towers-check.ts <id> --survey --games 12`
 to check it.
 

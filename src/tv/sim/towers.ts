@@ -60,6 +60,31 @@ export function layer(b: Builder, y: number, o: LayerOpts): number {
   return y + GAP + PIECE_H;
 }
 
+/** A single piece centred at (x, z) with its bottom at `y`. Returns the top of its layer. */
+export function piece(b: Builder, x: number, y: number, z: number, len: number, ang = X, gold = false): number {
+  b.box(gold ? 'jgold' : 'jenga', x, y, z, len, PIECE_H, 1, ang);
+  return y + GAP + PIECE_H;
+}
+
+/**
+ * Pieces side by side, starting flush with `from` and adding more toward `to` while they fit.
+ * X pieces (running along x) are laid out across z, centred on x = `at`; Z pieces across x, centred
+ * on z = `at`. Returns how far the last piece reaches (its outer edge).
+ */
+export function fill(b: Builder, y: number, o: { ang: number; from: number; to: number; at: number; len: number; gold?: number[] }): number {
+  const dir = Math.sign(o.to - o.from) || 1;
+  let edge = o.from;
+  for (let k = 0; ; k++) {
+    const c = o.from + dir * (0.5 + k * PITCH);
+    if ((c + dir * 0.5 - o.to) * dir > 0.011) break;
+    const gold = o.gold?.includes(k) ?? false;
+    if (o.ang === X) piece(b, o.at, y, c, o.len, X, gold);
+    else piece(b, c, y, o.at, o.len, Z, gold);
+    edge = c + dir * 0.5;
+  }
+  return edge;
+}
+
 /** Full-width span of n pieces side by side. */
 export const span = (n: number) => n + (n - 1) * (PITCH - 1);
 
@@ -303,6 +328,220 @@ export const TOWERS: TowerDef[] = [
         y = layer(b, y, { n: 3, len: 3.2, ang: (k * Math.PI) / 6, cx });
       }
       crown(b, cx, y, 0);
+    },
+  },
+  // -------------------------------------------------------------------------------- blueprints
+  {
+    id: 'corkscrew',
+    name: 'Corkscrew',
+    blurb: 'Every layer turns and every layer shifts, so the whole tower winds up like a spring.',
+    modes: ['pull'],
+    substeps: 1,
+    build(b) {
+      b.plinth(0, 0, 5.6, 5.6, 1);
+      let y = 1;
+      const L = 26, r = 0.55;
+      let cx = 0, cz = 0;
+      for (let i = 0; i < L; i++) {
+        const orbit = (i * Math.PI) / 8;
+        cx = r * Math.cos(orbit);
+        cz = r * Math.sin(orbit);
+        y = layer(b, y, { n: 3, len: 3.4, ang: (i * Math.PI) / 4, cx, cz, gold: i === 9 ? [0] : i === 17 ? [2] : [] });
+      }
+      crown(b, cx, y, cz);
+    },
+  },
+  {
+    id: 'buttress',
+    name: 'Flying Buttress',
+    blurb: 'A spire propped up by two buttresses that lean too far to stand alone. They hold each other up.',
+    modes: ['pull'],
+    substeps: 1,
+    yaw: 14,
+    build(b) {
+      const J = 8, lean = 0.4;
+      const top = 3.35, base = top + (J - 1) * lean;
+      b.plinth(0, 0, 3.8, 3.8, 1);
+      b.plinth(-base - 0.4, 0, 4.4, 3.8, 1);
+      b.plinth(base + 0.4, 0, 4.4, 3.8, 1);
+      let y = 1;
+      for (let i = 0; i < J; i++) {
+        layer(b, y, { n: 3, len: 3, ang: alt(i) });
+        for (const s of [-1, 1]) layer(b, y, { n: 3, len: 3, ang: alt(i), cx: s * (base - i * lean), gold: i === 3 && s > 0 ? [0] : [] });
+        y += GAP + PIECE_H;
+      }
+      // tie course: long pieces through the spire and both buttress tops
+      y = layer(b, y, { n: 3, len: 2 * (top + 1.5), ang: X });
+      for (let i = 0; i < 8; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1), gold: i === 5 ? [2] : [] });
+      crown(b, 0, y, 0);
+    },
+  },
+  {
+    id: 'pivot',
+    name: 'Double Pivot',
+    blurb: 'The top half balances on one piece, and the top of that on another. Keep it level.',
+    modes: ['pull'],
+    substeps: 1,
+    build(b) {
+      b.plinth(0, 0, 5, 5, 1);
+      let y = 1;
+      for (let i = 0; i < 3; i++) y = layer(b, y, { n: 4, len: span(4), ang: alt(i) });
+      for (let i = 0; i < 8; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1) });
+      // pivot 1: a single piece running along x, across the last layer...
+      y = piece(b, 0, y, 0, 3, X);
+      // ...under a wide deck that overhangs it both ways
+      y = layer(b, y, { n: 3, len: span(5), ang: Z });
+      y = layer(b, y, { n: 5, len: span(5), ang: X, gold: [0] });
+      for (let i = 0; i < 4; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1) });
+      // pivot 2, running along z this time
+      y = piece(b, 0, y, 0, 3, Z);
+      y = layer(b, y, { n: 3, len: span(5), ang: X });
+      y = layer(b, y, { n: 5, len: span(5), ang: Z });
+      for (let i = 0; i < 4; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i) });
+      crown(b, 0, y, 0);
+    },
+  },
+  {
+    id: 'corbel',
+    name: 'Corbel Arch',
+    blurb: 'Two pillars step inward layer by layer until they meet. Heavy balconies keep them from tipping in.',
+    modes: ['pull'],
+    substeps: 1,
+    yaw: 12,
+    build(b) {
+      const P = 4.2, xo = P + 1.5;
+      const REACH = 6.5; // balcony pieces: from the pillar's inside face out past its outside
+      b.plinth(-P, 0, 3.8, 3.8, 1);
+      b.plinth(P, 0, 3.8, 3.8, 1);
+      let y = 1;
+      for (let i = 0; i < 6; i++) {
+        for (const s of [-1, 1]) {
+          if (i === 3) {
+            // balcony: the X layer pokes far out past the outside of the pillar...
+            layer(b, y, { n: 3, len: REACH, ang: X, cx: s * (P - 1.5 + REACH / 2), gold: s > 0 ? [2] : [] });
+          } else if (i === 4) {
+            // ...and the Z layer above carries more pieces out on it, as counterweights
+            layer(b, y, { n: 3, len: 3, ang: Z, cx: s * P });
+            fill(b, y, { ang: Z, from: s * (P + 1.54), to: s * (P - 1.4 + REACH), at: 0, len: 3 });
+          } else layer(b, y, { n: 3, len: 3, ang: alt(i), cx: s * P });
+        }
+        y += GAP + PIECE_H;
+      }
+      // corbels: every layer reaches a little further in than the one below
+      const step = 2.2 / 6;
+      for (let i = 6; i < 12; i++) {
+        const xi = P - 1.5 - step * (i - 5);
+        for (const s of [-1, 1]) {
+          if (i % 2 === 0) layer(b, y, { n: 3, len: xo - xi, ang: X, cx: (s * (xo + xi)) / 2 });
+          else fill(b, y, { ang: Z, from: s * xi, to: s * xo, at: 0, len: 3 });
+        }
+        y += GAP + PIECE_H;
+      }
+      // the keystone course: long pieces right across both pillars
+      y = layer(b, y, { n: 3, len: 2 * xo, ang: X, gold: [1] });
+      // turrets on the pillars and a spire in the middle, each with a crown
+      let ty = y;
+      for (let i = 0; i < 3; i++) {
+        layer(b, ty, { n: 3, len: 3, ang: alt(i + 1), cx: -P });
+        ty = layer(b, ty, { n: 3, len: 3, ang: alt(i + 1), cx: P });
+      }
+      crown(b, -P, ty, 0, 0.8);
+      crown(b, P, ty, 0, 0.8);
+      for (let i = 0; i < 6; i++) y = layer(b, y, { n: 3, len: 3, ang: alt(i + 1) });
+      crown(b, 0, y, 0);
+    },
+  },
+  {
+    id: 'trident',
+    name: 'The Trident',
+    blurb: "A hollow frame that's all tension, a wide deck, and three spires tied by bridges. Three crowns.",
+    modes: ['pull'],
+    substeps: 1,
+    yaw: 6,
+    build(b) {
+      b.plinth(0, 0, 6, 6, 1);
+      let y = 1;
+      for (let i = 0; i < 3; i++) y = layer(b, y, { n: 5, len: span(5), ang: alt(i) });
+      // the hollow: only the two outside pieces of each layer, a frame around empty space
+      for (let i = 0; i < 4; i++) y = layer(b, y, { n: 5, len: span(5), ang: alt(i + 1), skip: [1, 2, 3] });
+      // deck, widening to carry three spires
+      y = layer(b, y, { n: 5, len: span(8), ang: Z });
+      y = layer(b, y, { n: 8, len: span(8), ang: X, gold: [3] });
+      // three spires, two pieces wide, the middle one tallest, tied by bridges across all three
+      const xs = [-3, 0, 3];
+      const tops = [y, y, y];
+      for (let k = 0; k < 12; k++) {
+        const ly = y + k * (GAP + PIECE_H);
+        if (k === 3 || k === 7) {
+          const t = layer(b, ly, { n: 2, len: 2 * 3 + span(2), ang: X, gold: k === 3 ? [0] : [] });
+          tops[0] = tops[1] = tops[2] = t;
+          continue;
+        }
+        for (let t = 0; t < 3; t++) {
+          if (k > 7 && t !== 1) continue;
+          tops[t] = layer(b, ly, { n: 2, len: span(2), ang: alt(k + 1), cx: xs[t] });
+        }
+      }
+      for (let t = 0; t < 3; t++) crown(b, xs[t], tops[t], 0, 0.8);
+    },
+  },
+  {
+    id: 'j78d',
+    name: 'J-78-D',
+    blurb: 'Arches, a flying buttress, balconies and three spires, one on a single-piece pivot. Stability: 24%.',
+    modes: ['pull'],
+    substeps: 1,
+    yaw: 10,
+    build(b) {
+      const P = 4.3, xo = P + 1.5, xin = P - 1.5;
+      const H = GAP + PIECE_H;
+      b.plinth(-P, 0, 3.8, 3.8, 1);
+      b.plinth(P, 0, 3.8, 3.8, 1);
+      // storeys (layer numbers): lower corbel arch 6-11, lintel 12, upper storey 13-16,
+      // upper corbel 17-20, top lintel 21
+      const LINTELS = [12, 21];
+      const corbel = (i: number) => (i >= 6 && i <= 11 ? xin - (2.3 / 6) * (i - 5) : i >= 17 && i <= 20 ? xin - 0.4 * (i - 16) : null);
+      // diagonal truss buttress leaning in on the right pillar's outside, tied in at layer BJ
+      const BJ = 8, blean = 0.33, btop = xo + 0.35 + 1.5, bbase = btop + (BJ - 1) * blean;
+      b.plinth(bbase + 0.3, 0, 4.2, 3.8, 1);
+      // cantilevered balconies on the left pillar (the buttress's counterweight)
+      const BALCONY = [BJ, 14];
+      let y = 1;
+      for (let i = 0; i <= 21; i++, y += H) {
+        const ang = alt(i);
+        if (LINTELS.includes(i)) {
+          layer(b, y, { n: 3, len: 2 * xo, ang: X, gold: i === 12 ? [2] : [] });
+          continue;
+        }
+        if (i < BJ) layer(b, y, { n: 3, len: 3, ang, cx: bbase - i * blean, gold: i === 2 ? [1] : [] });
+        for (const s of [-1, 1]) {
+          const ci = corbel(i);
+          let out = xo;
+          if (s > 0 && i === BJ) out = btop + 1.5;
+          if (s < 0 && BALCONY.includes(i)) out = xo + 2.2;
+          if (ci === null && out === xo) {
+            layer(b, y, { n: 3, len: 3, ang, cx: s * P, gold: i === 15 && s > 0 ? [0] : [] });
+            continue;
+          }
+          const inner = ci ?? xin;
+          if (ang === X) layer(b, y, { n: 3, len: out - inner, ang: X, cx: (s * (out + inner)) / 2 });
+          else fill(b, y, { ang: Z, from: s * inner, to: s * out, at: 0, len: 3 });
+        }
+        // weights standing out on each balcony
+        if (BALCONY.includes(i - 1)) fill(b, y, { ang: Z, from: -(xo + 0.04), to: -(xo + 2.2), at: 0, len: 3 });
+      }
+      // three spires on the top lintel; the middle one balances on a single pivot piece
+      let sy = y;
+      for (let k = 0; k < 4; k++) {
+        layer(b, sy, { n: 2, len: span(2), ang: alt(k + 1), cx: -P });
+        sy = layer(b, sy, { n: 2, len: span(2), ang: alt(k + 1), cx: P, gold: k === 2 ? [1] : [] });
+      }
+      crown(b, -P, sy, 0, 0.8);
+      crown(b, P, sy, 0, 0.8);
+      y = piece(b, 0, y, 0, 3, Z);
+      y = layer(b, y, { n: 3, len: span(4), ang: X });
+      for (let k = 0; k < 6; k++) y = layer(b, y, { n: 3, len: 3, ang: alt(k + 1) });
+      crown(b, 0, y, 0);
     },
   },
 ];

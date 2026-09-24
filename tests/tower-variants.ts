@@ -2,7 +2,7 @@
 // tests/towers-check.ts (e.g. `tsx tests/towers-check.ts mytower --survey --games 12`) without
 // adding it to the game. When a design is good, move it into TOWERS in src/tv/sim/towers.ts.
 import type { TowerDef } from '../src/tv/sim/towers';
-// import { layer, span, crown, X, Z } from '../src/tv/sim/towers';
+// import { layer, piece, fill, span, crown, X, Z } from '../src/tv/sim/towers';
 
 export const VARIANTS: TowerDef[] = [
   // {
