@@ -17,7 +17,7 @@ of a wobbly tower without toppling it.
 | --- | --- | --- |
 | **Blast Party** | Everyone at once | Timed levels. Knock blocks off their stands; whoever's ball knocked it gets the points. Gold = 10, Gem = 25, Skull = −10. |
 | **Best Shot** | Take turns | Everyone gets 3 balls on an identical copy of the level. Biggest topple wins the round. |
-| **Tower Pull** | Take turns | Jenga-style. Aim at a block, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Some blocks are loose, some are stuck. There's no time limit, but you can't pass: your turn only ends when a block comes all the way out. Drop the crown and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
+| **Tower Pull** | Take turns | Jenga-style. Aim at a block, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every block slides out, so the physics is the challenge: pull the wrong one (like a side block from a layer that's already missing its middle) and the tower goes over. There's no time limit, but you can't pass: your turn only ends when a block comes all the way out. Drop the crown and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
 
 Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explode when two touch),
 **ghost** blocks (vanish when hit), **ice** (slippery), **stone** (heavy).

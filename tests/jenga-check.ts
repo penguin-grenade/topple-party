@@ -19,6 +19,7 @@ async function main() {
     const ms = (performance.now() - t0) / 480;
     // try pulling each block in layers 3..11 (fresh tower each time), report result
     const results: string[] = [];
+    let stuck = 0;
     for (const layer of [2, 5, 8, 11, 13]) {
       for (const k of [0, 1, 2]) {
         sim.load(buildLevel(TOWER, seed), { autoScore: false, substeps });
@@ -34,11 +35,12 @@ async function main() {
         if (!ent.gone) sim.grabEnd();
         run(sim, 2);
         const drift = maxDrift(sim, ent);
-        const loose = ent.size.y < 0.59 ? '*' : ' ';
-        results.push(`L${layer}${'LMR'[k]}${loose}:${moved}${drift > 1 ? ' COLLAPSE' : drift > 0.3 ? ' shaky' : ''}`);
+        if (!ent.gone) stuck++;
+        results.push(`L${layer}${'LMR'[k]}:${moved}${drift > 0.85 ? ` COLLAPSE(${drift.toFixed(2)})` : drift > 0.3 ? ` shaky(${drift.toFixed(2)})` : ''}`);
       }
     }
-    console.log(`seed ${seed} substeps ${substeps}: idle drift ${idleDrift.toFixed(3)} (${ms.toFixed(2)} ms/frame)\n  ` + results.join('  '));
+    console.log(`seed ${seed} substeps ${substeps}: idle drift ${idleDrift.toFixed(3)} (${ms.toFixed(2)} ms/frame), ${stuck} stuck\n  ` + results.join('  '));
+    if (stuck > 0 || idleDrift > 0.15) process.exitCode = 1;
   }
 }
 main();

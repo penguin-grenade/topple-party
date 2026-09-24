@@ -395,16 +395,15 @@ export const TOWER: LevelDef = {
   blurb: "Pull a block out. Don't let the crown fall!",
   modes: ['pull'],
   cam: { pos: [10.6, 10.2, 14.8], look: [0, 5.5, 0] },
-  build(b, rnd) {
+  build(b) {
     b.plinth(0, 0, 3.8, 3.8, 1);
     let y = 1;
     for (let layer = 0; layer < JENGA_LAYERS; layer++) {
       const alongX = layer % 2 === 0;
-      // In a real tower some blocks are a hair thinner and carry no load; those are the easy ones.
-      const loose = rnd() < 0.8 ? Math.floor(rnd() * 3) : -1;
       for (let k = 0; k < 3; k++) {
         const off = (k - 1) * 1.02;
-        const h = k === loose ? JENGA_H - 0.04 : JENGA_H;
+        // Every block is the same size and slides freely; the risk is what's left holding the tower up.
+        const h = JENGA_H;
         if (alongX) b.box('jenga', 0, y, off, 3, h, 1);
         else b.box('jenga', off, y, 0, 1, h, 3);
       }

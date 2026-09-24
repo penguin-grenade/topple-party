@@ -95,6 +95,8 @@ export class Sim {
   opts: SimOptions = { autoScore: true, substeps: 1 };
   private booms: PendingBoom[] = [];
   grab: Grab | null = null;
+  /** Tower Pull grab strength: spring (N/m), damping (N·s/m), max force (N) */
+  grabTuning = { K: 400, C: 40, FMAX: 300 };
   /** total points still on the stands (for "level cleared") */
   paused = false;
 
@@ -357,7 +359,7 @@ export class Sim {
     if (!g || g.ent.gone) return;
     const p = g.ent.body.translation();
     const v = g.ent.body.linvel();
-    const K = 260, C = 30, FMAX = 70;
+    const { K, C, FMAX } = this.grabTuning;
     let fx = K * (g.target.x - p.x) - C * v.x;
     let fz = K * (g.target.z - p.z) - C * v.z;
     const f = Math.hypot(fx, fz);
