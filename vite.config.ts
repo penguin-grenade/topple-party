@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => ({
   base: './',
   plugins: mode === 'https' ? [basicSsl()] : [],
   build: {
-    target: 'es2020',
+    // Smart-TV browsers lag years behind. Rapier's WebAssembly needs Chrome 75+, so compile down to that.
+    target: ['chrome75', 'safari15', 'firefox79'],
     chunkSizeWarningLimit: 2500,
     rollupOptions: {
       input: {

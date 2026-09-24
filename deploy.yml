@@ -1,0 +1,81 @@
+name: Build & deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the game (TV page + phone controller)
+        run: |
+          npm install
+          npm run build
+
+      - name: Work out this repo's GitHub Pages URL
+        id: url
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          if [ "${REPO,,}" = "${OWNER}.github.io" ]; then URL="https://${OWNER}.github.io/"; else URL="https://${OWNER}.github.io/${REPO}/"; fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Game URL: $URL"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build the Android TV app (points at the Pages URL)
+        env:
+          TOPPLE_KEYSTORE_BASE64: ${{ secrets.TOPPLE_KEYSTORE_BASE64 }}
+          TOPPLE_KEYSTORE_PASSWORD: ${{ secrets.TOPPLE_KEYSTORE_PASSWORD }}
+        run: |
+          sed -i "s#static final String GAME_URL = \".*\";#static final String GAME_URL = \"${{ steps.url.outputs.url }}\";#" \
+            android/app/src/main/java/io/github/penguingrenade/toppleparty/Config.java
+          if [ -n "$TOPPLE_KEYSTORE_BASE64" ]; then
+            echo "$TOPPLE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/topple.jks"
+            export TOPPLE_KEYSTORE="$RUNNER_TEMP/topple.jks"
+          fi
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../dist/TopplePartyTV.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TopplePartyTV-apk
+          path: dist/TopplePartyTV.apk
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

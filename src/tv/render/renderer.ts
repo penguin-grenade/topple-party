@@ -52,7 +52,8 @@ export class Renderer {
     this.gl.toneMappingExposure = 1.05;
     this.gl.shadowMap.enabled = true;
     this.gl.shadowMap.type = THREE.PCFShadowMap;
-    const lowEnd = /TopplePartyTV|Android/i.test(navigator.userAgent);
+    // TV hardware: Android TV app, Android boxes, and smart-TV browsers (Samsung Tizen, LG webOS, Fire TV, Sony, Panasonic, Sharp, Hisense/Vidaa, HbbTV...)
+    const lowEnd = /TopplePartyTV|Android|SMART-?TV|SmartTV|Tizen|Web0S|webOS|NetCast|BRAVIA|AFT[A-Z]|CrKey|HbbTV|Viera|AQUOS|VIDAA|Roku/i.test(navigator.userAgent);
     this.lowQuality = lowEnd;
 
     // sky + fog

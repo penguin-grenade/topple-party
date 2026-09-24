@@ -66,7 +66,27 @@ If the TV app can't reach the game it shows a screen where you can edit the URL 
 ### TV remote
 
 Arrows move, **OK** selects, **Back** pauses / goes back. In the lobby: pick a mode, set the
-number of rounds with ◀ ▶, then **START**. `M` on a keyboard toggles sound.
+number of rounds with ◀ ▶, then **START**. `M` on a keyboard toggles sound, `F` toggles full screen.
+Pointer remotes (LG Magic Remote, Samsung's cursor) and mice can click every card and button.
+
+## Playing in a smart TV's web browser (no app needed)
+
+Any TV (or streaming stick, console, or laptop plugged into the TV) with a modern enough browser
+can run the game straight from the web page:
+
+1. Open **<https://penguin-grenade.github.io/topple-party/>** in the TV's browser (Samsung Internet
+   on Tizen, the LG webOS browser, Silk on Fire TV, and so on). Bookmark it; typing URLs with a remote
+   is no fun.
+2. Click **Full screen** (bottom right), or press `F` on a keyboard.
+3. Press OK or click once so the browser allows sound.
+4. Phones scan the QR code as usual.
+
+The remote's **Back** button pauses the game instead of leaving the page.
+
+**Requirements:** WebGL 2, WebAssembly, and WebRTC in a roughly Chrome 75-level browser engine. That
+usually means TVs from about 2020–2021 onward. If a browser is too old, the page says what's
+missing instead of showing a blank screen. This hasn't been tested on real TVs yet, and some TV
+browsers may block WebRTC (phones then can't connect); the Android TV app avoids that.
 
 ## How the networking works
 

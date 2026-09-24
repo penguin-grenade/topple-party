@@ -1,7 +1,7 @@
 import { NetHost, netConfigFromUrl, netConfigToQuery, type Link, type NetConfig } from '../shared/net';
 import { MAX_PLAYERS, MODES, PLAYER_COLORS, PROTOCOL_VERSION, cleanName, type C2S, type ModeId, type PadView, type S2C } from '../shared/protocol';
 import { Sfx } from './audio';
-import { Hud, LOBBY_FOCUS, type ChipInfo, type LobbyFocus } from './hud';
+import { Hud, ICON_SOUND_OFF, ICON_SOUND_ON, LOBBY_FOCUS, type ChipInfo, type LobbyFocus } from './hud';
 import { BestShotMode, BlastMode, Mode, PracticeMode, PullMode } from './modes';
 import { Renderer } from './render/renderer';
 import type { LevelSpec } from './sim/levels';
@@ -58,6 +58,7 @@ export class Game {
   private lastRanks = new Map<number, number>();
   private mouse: { down: boolean; x: number; y: number; t0: number; dragY: number } = { down: false, x: 0, y: 0, t0: 0, dragY: 0 };
   /** counters for debugging / automated tests */
+  private lastKeyBack = 0;
   stats = { throws: 0, ballHits: 0, booms: 0, scored: 0, last: { x: 0, y: 0, p: 0 } };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -82,6 +83,7 @@ export class Game {
       if (s === 'ready') this.hud.setNetStatus('Ready for players', 'ok');
       else if (s === 'connecting') this.hud.setNetStatus('Opening the room…', 'busy');
       else if (s === 'reconnecting') this.hud.setNetStatus('Reconnecting to the join server… (players already in are fine)', 'warn');
+      else if (detail === 'browser-incompatible') this.hud.setNetStatus("This browser doesn't support WebRTC, so phones can't connect. Try the Android TV app or another browser.", 'err');
       else this.hud.setNetStatus(`Can't reach the join server (${detail ?? 'offline'}). Retrying…`, 'err');
     };
     this.net.onLink = (l) => this.onLink(l);
@@ -111,7 +113,120 @@ export class Game {
     requestAnimationFrame(loop);
     window.addEventListener('keydown', (e) => this.onKey(e));
     this.setupMouse();
+    this.setupPointerUi();
     (window as any).__tvBack = () => this.back();
+    if (!Game.inApp) {
+      // TV browsers map the remote's Back button to browser-back. Keep one history entry of our own
+      // so Back pauses/closes menus instead of leaving the game.
+      history.pushState({ topple: 1 }, '');
+      window.addEventListener('popstate', () => {
+        // some remotes send a Back keydown *and* navigate back; don't handle the same press twice
+        if (now() - this.lastKeyBack < 0.6 || this.back()) history.pushState({ topple: 1 }, '');
+        else history.back();
+      });
+    }
+  }
+
+  static readonly inApp = /TopplePartyTV/.test(navigator.userAgent);
+
+  // ------------------------------------------------------------------ pointer (mouse, LG Magic Remote, Samsung pointer)
+  private setupPointerUi() {
+    const ui = document.getElementById('ui')!;
+    ui.addEventListener('click', (e) => {
+      const el = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+      if (!el) return;
+      this.sfx.unlock();
+      this.uiAction(el.dataset.act!, Number(el.dataset.i ?? 0));
+    });
+    ui.addEventListener('mouseover', (e) => {
+      const el = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+      if (!el || this.phase !== 'lobby') return;
+      const act = el.dataset.act!;
+      const f: LobbyFocus | null = act === 'mode' ? (`mode${el.dataset.i}` as LobbyFocus) : act.startsWith('rounds') ? 'rounds' : act === 'start' ? 'start' : null;
+      if (f && f !== this.lobbyFocus) {
+        this.lobbyFocus = f;
+        this.uiTimer = 0;
+      }
+    });
+    // hide the cursor when the pointer is idle (TV browsers always show one)
+    let idle = 0;
+    const wake = () => {
+      document.body.classList.remove('nocursor');
+      clearTimeout(idle);
+      idle = window.setTimeout(() => document.body.classList.add('nocursor'), 2500);
+    };
+    window.addEventListener('mousemove', wake);
+    wake();
+    const fs = document.getElementById('fsTool')!;
+    const d = document as any;
+    const canFs = !!(d.fullscreenEnabled || d.webkitFullscreenEnabled);
+    if (Game.inApp || !canFs) fs.remove();
+    this.refreshTools();
+  }
+
+  private uiAction(act: string, i: number) {
+    switch (act) {
+      case 'mode':
+        if (this.phase !== 'lobby') return;
+        this.selMode = MODES[i].id;
+        this.lobbyFocus = `mode${i}` as LobbyFocus;
+        this.sfx.blip(true);
+        break;
+      case 'rounds-':
+      case 'rounds+':
+        if (this.phase !== 'lobby') return;
+        this.rounds = clamp(this.rounds + (act === 'rounds+' ? 1 : -1), 1, 8);
+        this.lobbyFocus = 'rounds';
+        this.sfx.blip(act === 'rounds+');
+        break;
+      case 'start':
+        if (this.phase === 'lobby') this.startGame();
+        return;
+      case 'again':
+        if (this.phase === 'results') this.startGame();
+        return;
+      case 'lobby':
+        this.enterLobby();
+        return;
+      case 'resume':
+        this.resume();
+        return;
+      case 'pause':
+        this.pause();
+        return;
+      case 'sound':
+        this.sfx.setMuted(!this.sfx.muted);
+        this.refreshTools();
+        return;
+      case 'fullscreen':
+        this.toggleFullscreen();
+        return;
+    }
+    this.uiTimer = 0;
+    this.pushViews();
+  }
+
+  toggleFullscreen() {
+    const d = document as any;
+    const el = document.documentElement as any;
+    try {
+      if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      else {
+        const p = (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch {
+      /* not allowed here */
+    }
+  }
+
+  private refreshTools() {
+    const snd = document.getElementById('soundTool');
+    if (snd) {
+      const html = this.sfx.muted ? ICON_SOUND_OFF : ICON_SOUND_ON;
+      if (snd.innerHTML !== html) snd.innerHTML = html;
+    }
+    document.getElementById('pauseTool')?.classList.toggle('hidden', !(this.phase === 'playing' && !this.paused));
   }
 
   // ------------------------------------------------------------------ helpers used by modes
@@ -569,6 +684,7 @@ export class Game {
     this.uiTimer -= dt;
     if (this.uiTimer <= 0) {
       this.uiTimer = 0.25;
+      this.refreshTools();
       if (this.phase === 'lobby') {
         const connected = this.players.filter((p) => p.connected).length;
         this.hud.renderLobby(this.selMode, this.rounds, this.lobbyFocus, this.host()?.name ?? null, connected);
@@ -640,10 +756,15 @@ export class Game {
     if (k === 'GoBack' || k === 'BrowserBack') return; // handled by the Android app via __tvBack
     const up = k === 'ArrowUp', down = k === 'ArrowDown', left = k === 'ArrowLeft', right = k === 'ArrowRight';
     const ok = k === 'Enter' || k === ' ' || e.keyCode === 23;
-    const esc = k === 'Escape' || k === 'Backspace';
+    const esc = k === 'Escape' || k === 'Backspace' || e.keyCode === 461 || e.keyCode === 10009;
     if (k === 'm' || k === 'M') {
       this.sfx.setMuted(!this.sfx.muted);
       this.hud.toast(this.sfx.muted ? 'Sound off' : 'Sound on');
+      this.refreshTools();
+      return;
+    }
+    if (k === 'f' || k === 'F') {
+      this.toggleFullscreen();
       return;
     }
     if (k === 'F2' || k === '`') {
@@ -656,6 +777,7 @@ export class Game {
       return;
     }
     if (up || down || left || right || ok || esc) e.preventDefault();
+    if (esc) this.lastKeyBack = now();
 
     if (this.paused) {
       if (up || down) {
@@ -743,7 +865,7 @@ export class Game {
     });
     window.addEventListener('mousedown', (e) => {
       const p = mp();
-      if (!p || e.button !== 0) return;
+      if (!p || e.button !== 0 || (e.target as HTMLElement).closest?.('[data-act]')) return;
       this.mouse = { down: true, x: e.clientX, y: e.clientY, t0: now(), dragY: e.clientY };
       if (this.mode instanceof PullMode) this.mode.onGrab(p, p.aim.x, p.aim.y);
     });

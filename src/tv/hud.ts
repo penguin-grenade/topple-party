@@ -27,6 +27,13 @@ export interface ReticleInfo {
   dim?: boolean;
 }
 
+// inline SVG instead of emoji/symbol characters: many TV browsers ship without those glyphs
+const CROWN = '<svg class="crown" viewBox="0 0 24 18"><path fill="#ffd23f" stroke="#1b1238" stroke-width="1.6" stroke-linejoin="round" d="M2 16V5l5 5 5-8 5 8 5-5v11z"/></svg>';
+export const ICON_SOUND_ON =
+  '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
+export const ICON_SOUND_OFF =
+  '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M16 9l6 6M22 9l-6 6"/></svg>';
+
 export type LobbyFocus = 'mode0' | 'mode1' | 'mode2' | 'rounds' | 'start';
 export const LOBBY_FOCUS: LobbyFocus[] = ['mode0', 'mode1', 'mode2', 'rounds', 'start'];
 
@@ -61,13 +68,13 @@ export class Hud {
   renderLobby(mode: ModeId, rounds: number, focus: LobbyFocus, hostName: string | null, playerCount: number) {
     const modes = $('modes');
     modes.innerHTML = MODES.map(
-      (m, i) => `<div class="modeCard ${m.id === mode ? 'sel' : ''} ${focus === `mode${i}` ? 'focus' : ''}">
+      (m, i) => `<div class="modeCard ${m.id === mode ? 'sel' : ''} ${focus === `mode${i}` ? 'focus' : ''}" data-act="mode" data-i="${i}">
         <div class="mName">${m.name}</div><div class="mTag">${esc(m.tagline)}</div>
         <div class="mBadge">${m.turns ? 'Take turns' : 'All at once'}</div></div>`,
     ).join('');
     const label = MODES.find((m) => m.id === mode)!.roundsLabel;
     const rr = $('roundsRow');
-    rr.innerHTML = `<span class="arrow">◀</span><b>${rounds}</b> ${label}<span class="arrow">▶</span>`;
+    rr.innerHTML = `<span class="arrow" data-act="rounds-">◀</span><b>${rounds}</b> ${label}<span class="arrow" data-act="rounds+">▶</span>`;
     rr.classList.toggle('focus', focus === 'rounds');
     const sb = $('startBtn');
     sb.classList.toggle('focus', focus === 'start');
@@ -91,7 +98,7 @@ export class Hud {
         continue;
       }
       html += `<div class="chip ${c.connected ? '' : 'away'} ${c.active ? 'active' : ''}" style="--c:${c.color}">
-        <div class="dot">${esc(c.name.slice(0, 1).toUpperCase())}${c.host ? '<span class="crown">♛</span>' : ''}</div>
+        <div class="dot">${esc(c.name.slice(0, 1).toUpperCase())}${c.host ? CROWN : ''}</div>
         <div class="cName">${esc(c.name)}</div>
         ${lobby ? '' : `<div class="cScore">${c.score}</div>`}
         ${c.delta ? `<div class="cDelta ${c.delta < 0 ? 'neg' : ''}">${c.delta > 0 ? '+' : ''}${c.delta}</div>` : ''}
@@ -204,7 +211,7 @@ export class Hud {
       .map((r) => `<div class="restRow" style="--c:${r.color}"><span>${r.rank}.</span><b>${esc(r.name)}</b><i>${r.score} pts</i></div>`)
       .join('');
     el.innerHTML = `<div class="resTitle">${title}</div><div class="podium">${ordered}</div><div class="rest">${rest}</div>
-      <div class="resBtns"><div class="btn ${focus === 0 ? 'focus' : ''}">Play again</div><div class="btn ${focus === 1 ? 'focus' : ''}">Back to lobby</div></div>
+      <div class="resBtns"><div class="btn ${focus === 0 ? 'focus' : ''}" data-act="again">Play again</div><div class="btn ${focus === 1 ? 'focus' : ''}" data-act="lobby">Back to lobby</div></div>
       <div class="resHint">${hostName ? `${esc(hostName)} (host) can choose on their phone.` : ''}</div>`;
   }
   hideResults() {
@@ -215,8 +222,8 @@ export class Hud {
     const el = $('pause');
     el.classList.toggle('hidden', !on);
     if (on)
-      el.innerHTML = `<div class="pTitle">Paused</div><div class="resBtns col"><div class="btn ${focus === 0 ? 'focus' : ''}">Resume</div>
-      <div class="btn ${focus === 1 ? 'focus' : ''}">Quit to lobby</div></div>`;
+      el.innerHTML = `<div class="pTitle">Paused</div><div class="resBtns col"><div class="btn ${focus === 0 ? 'focus' : ''}" data-act="resume">Resume</div>
+      <div class="btn ${focus === 1 ? 'focus' : ''}" data-act="lobby">Quit to lobby</div></div>`;
   }
 
   toast(text: string, color = '#ffffff') {

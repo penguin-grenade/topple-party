@@ -3,6 +3,7 @@ import { initPhysics } from './sim/sim';
 import { LEVELS, PRACTICE, TOWER, buildLevel } from './sim/levels';
 
 async function boot() {
+  if ((window as any).__compatFail) return; // the inline check already explained what's missing
   const canvas = document.getElementById('gl') as HTMLCanvasElement;
   const bootEl = document.getElementById('boot')!;
   try {
@@ -13,6 +14,8 @@ async function boot() {
     (window as any).__game = game;
     Object.assign(window as any, { __levels: [...LEVELS, PRACTICE, TOWER], __buildLevel: buildLevel });
     game.begin();
+    (window as any).__booted = true;
+    keepAwake();
     const inApp = /TopplePartyTV/.test(navigator.userAgent);
     const hint = document.getElementById('soundHint')!;
     if (inApp) {
@@ -34,6 +37,27 @@ async function boot() {
     console.error(e);
     bootEl.innerHTML = `<div class="bootErr">Something went wrong starting the game.<br><small>${String((e as Error)?.message ?? e)}</small></div>`;
   }
+}
+
+/** Ask the TV not to start its screensaver while the game is open (browsers that support it). */
+function keepAwake() {
+  const nav = navigator as any;
+  if (!nav.wakeLock) return;
+  let lock: any = null;
+  const req = () => {
+    if (lock || document.visibilityState !== 'visible') return;
+    nav.wakeLock
+      .request('screen')
+      .then((l: any) => {
+        lock = l;
+        l.addEventListener?.('release', () => (lock = null));
+      })
+      .catch(() => {});
+  };
+  req();
+  document.addEventListener('visibilitychange', req);
+  window.addEventListener('pointerdown', req);
+  window.addEventListener('keydown', req);
 }
 
 boot();

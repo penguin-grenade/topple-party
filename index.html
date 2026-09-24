@@ -15,14 +15,14 @@
   @media (min-aspect-ratio: 16/9) { html { font-size: calc(100vh * 16 / 9 / 120); } }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #8fc3ff; color: var(--ink);
     font-family: 'Fredoka', system-ui, 'Segoe UI', Roboto, sans-serif; user-select: none; cursor: default; }
-  #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-  #ui { position: fixed; inset: 0; pointer-events: none; }
+  #gl { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100vw; height: 100vh; display: block; }
+  #ui { position: fixed; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
   .hidden { display: none !important; }
   .panel { background: var(--panel); border: 0.18rem solid #ffffff22; border-radius: 1.6rem; box-shadow: 0 0.6rem 2rem #0005; backdrop-filter: blur(6px); }
   .outline { text-shadow: 0 0.2rem 0 #1b1238, 0.15rem 0 0 #1b1238, -0.15rem 0 0 #1b1238, 0 -0.15rem 0 #1b1238, 0 0.5rem 1rem #0006; }
 
   /* ---------------- lobby ---------------- */
-  #lobby { position: absolute; inset: 0; }
+  #lobby { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
   .logo { position: absolute; left: 3rem; top: 1.8rem; font-weight: 700; font-size: 5.4rem; line-height: .86; transform: rotate(-4deg); transform-origin: left top;
     color: #fff; text-shadow: 0 0.35rem 0 #1b1238, 0.25rem 0 0 #1b1238, -0.25rem 0 0 #1b1238, 0 -0.25rem 0 #1b1238, 0 0.8rem 1.6rem #0006; letter-spacing: .1rem; }
   .logo span { display: block; color: var(--gold); margin-left: .6rem; }
@@ -46,7 +46,6 @@
   .modeCard .mTag { color: var(--muted); font-size: 1.05rem; margin-top: .15rem; line-height: 1.25; padding-right: 7rem; }
   .modeCard .mBadge { position: absolute; right: 1rem; top: 1rem; font-size: .9rem; padding: .2rem .7rem; border-radius: 999px; background: #ffffff1f; font-weight: 600; }
   .modeCard.sel { background: #ffd23f26; border-color: var(--gold); }
-  .modeCard.sel .mName::after { content: ' ✓'; color: var(--gold); }
   .focus { outline: .3rem solid #7fd6ff; outline-offset: .2rem; transform: scale(1.02); }
   #roundsRow { display: flex; align-items: center; justify-content: center; gap: .8rem; font-size: 1.5rem; padding: .6rem; border-radius: 1rem; background: #ffffff12; }
   #roundsRow b { font-size: 2rem; color: var(--gold); }
@@ -62,7 +61,7 @@
     border: .2rem solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: 0 .4rem 1.2rem #0004; min-width: 8rem; }
   .chip .dot { position: relative; width: 2.6rem; height: 2.6rem; border-radius: 50%; background: var(--c); display: grid; place-items: center; font-weight: 700; font-size: 1.4rem;
     box-shadow: inset 0 -.25rem 0 #0003; text-shadow: 0 .1rem 0 #0005; flex: none; }
-  .chip .crown { position: absolute; top: -1.15rem; left: 50%; transform: translateX(-50%); color: var(--gold); font-size: 1.3rem; text-shadow: 0 .1rem 0 #1b1238; }
+  .chip .crown { position: absolute; top: -1.05rem; left: 50%; transform: translateX(-50%); width: 1.5rem; height: 1.15rem; }
   .chip .cName { font-weight: 600; font-size: 1.25rem; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chip .cScore { font-weight: 700; font-size: 1.5rem; margin-left: .2rem; color: var(--gold); min-width: 2rem; text-align: right; }
   .chip .cDelta { position: absolute; right: -.4rem; top: -1.3rem; font-weight: 700; font-size: 1.2rem; background: #33c46a; padding: .05rem .55rem; border-radius: 999px; animation: pop .3s; }
@@ -76,7 +75,7 @@
   @keyframes pop { from { transform: scale(0); } }
 
   /* ---------------- in-game hud ---------------- */
-  #hud { position: absolute; inset: 0; }
+  #hud { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
   #hudLeft { position: absolute; left: 2rem; top: 1.5rem; font-size: 1.5rem; padding: .6rem 1.2rem; border-radius: 1rem; background: var(--panel); }
   #hudLeft b { color: var(--gold); }
   #hudCenter { position: absolute; left: 50%; top: 1rem; transform: translateX(-50%); text-align: center; }
@@ -109,7 +108,7 @@
   @keyframes fall { to { transform: translate(var(--dx), 110vh) rotate(var(--r)); } }
 
   /* ---------------- reticles ---------------- */
-  #reticles { position: absolute; inset: 0; }
+  #reticles { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
   .reticle { position: absolute; left: 0; top: 0; width: 0; height: 0; transition: opacity .2s; }
   .reticle .ring { position: absolute; left: -2rem; top: -2rem; width: 4rem; height: 4rem; border-radius: 50%; border: .45rem solid var(--c);
     box-shadow: 0 0 0 .18rem #1b1238, inset 0 0 0 .18rem #1b1238, 0 0 1.2rem var(--c); }
@@ -121,7 +120,7 @@
   @keyframes rpulse { 0% { transform: scale(.6); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
   /* ---------------- results / pause ---------------- */
-  #results, #pause { position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, #2a1c5add, #120a2bf2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6rem; }
+  #results, #pause { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: radial-gradient(circle at 50% 40%, #2a1c5add, #120a2bf2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6rem; }
   .resTitle, .pTitle { font-size: 5rem; font-weight: 700; text-shadow: 0 .4rem 0 #0006; }
   .podium { display: flex; align-items: flex-end; gap: 1.4rem; }
   .pod { display: flex; flex-direction: column; align-items: center; gap: .4rem; width: 15rem; }
@@ -141,9 +140,21 @@
   .btn.focus { background: var(--gold); color: #2a1650; transform: scale(1.06); outline: none; }
   .resHint { color: var(--muted); font-size: 1.2rem; }
 
-  #soundHint { position: absolute; right: 1.4rem; bottom: 1.4rem; font-size: 1rem; background: #0007; padding: .4rem .9rem; border-radius: 999px; }
+  #soundHint { position: absolute; right: 1.4rem; bottom: 4.6rem; font-size: 1rem; background: #0007; padding: .4rem .9rem; border-radius: 999px; }
+  /* pointer / Magic Remote / mouse support */
+  [data-act] { pointer-events: auto; cursor: pointer; }
+  .modeCard:hover, #startBtn:hover, .btn:hover, .tbtn:hover { filter: brightness(1.15); }
+  #roundsRow .arrow { padding: 0 .6rem; }
+  #tvTools { position: absolute; right: 1.4rem; bottom: 1.4rem; display: flex; gap: .6rem; }
+  .tbtn { min-width: 3rem; height: 3rem; padding: 0 .9rem; border-radius: 999px; background: var(--panel); display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; font-weight: 600; box-shadow: 0 .3rem 1rem #0004; margin-left: .6rem; }
+  .tbtn svg { width: 1.4rem; height: 1.4rem; display: block; }
+  body.nocursor, body.nocursor * { cursor: none !important; }
+  .compat { max-width: 64rem; text-align: center; padding: 2rem; font-size: 1.8rem; line-height: 1.4; }
+  .compat b { color: var(--gold); }
+  .compat small { display: block; margin-top: 1.2rem; font-size: 1rem; color: var(--muted); word-break: break-all; }
   #debug { position: absolute; left: .6rem; top: .4rem; font: 1rem monospace; color: #fff; background: #0008; padding: .2rem .5rem; }
-  #boot { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #5b3cc4, #1b1238); transition: opacity .6s; z-index: 5; }
+  #boot { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #5b3cc4, #1b1238); transition: opacity .6s; z-index: 5; }
   #boot.done { opacity: 0; pointer-events: none; }
   #boot .logo { position: static; transform: rotate(-4deg); animation: bob 1.2s ease-in-out infinite; }
   @keyframes bob { 50% { transform: rotate(-2deg) translateY(-1rem); } }
@@ -167,7 +178,7 @@
         <div class="panelTitle">Game mode</div>
         <div id="modes"></div>
         <div id="roundsRow"></div>
-        <div id="startBtn">START</div>
+        <div id="startBtn" data-act="start">START</div>
         <div id="hostHint"></div>
       </div>
       <div id="netStatus" data-kind="busy">Starting…</div>
@@ -182,10 +193,39 @@
     <section id="results" class="hidden"></section>
     <section id="pause" class="hidden"></section>
     <div id="toasts"></div>
-    <div id="soundHint">Press any key or click for sound</div>
+    <div id="soundHint">Press OK (or click) for sound</div>
+    <div id="tvTools"><div class="tbtn" data-act="pause" id="pauseTool" title="Pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg></div><div class="tbtn" data-act="sound" id="soundTool" title="Sound"></div><div class="tbtn" data-act="fullscreen" id="fsTool"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>&nbsp;Full screen</div></div>
     <div id="debug" class="hidden"></div>
   </div>
   <div id="boot"><div class="logo">TOPPLE<span>PARTY</span></div></div>
+  <script>
+    // Runs before the game (plain ES5) so older smart-TV browsers get an explanation instead of a blank screen.
+    (function () {
+      var missing = [];
+      if (typeof WebAssembly !== 'object') missing.push('WebAssembly');
+      try {
+        var gl = document.createElement('canvas').getContext('webgl2');
+        if (!gl) missing.push('WebGL 2');
+        else if (gl.getExtension('WEBGL_lose_context')) gl.getExtension('WEBGL_lose_context').loseContext();
+      } catch (e) { missing.push('WebGL 2'); }
+      window.__compatMissing = missing;
+      function show(msg) {
+        var b = document.getElementById('boot');
+        if (!b) return;
+        b.className = '';
+        b.innerHTML = '<div class="compat">' + msg + '<small>' + navigator.userAgent.replace(/</g, '') + '</small></div>';
+      }
+      window.__compatShow = show;
+      if (missing.length) {
+        show('This browser can\u2019t run Topple Party. It\u2019s missing <b>' + missing.join('</b> and <b>') + '</b>.<br>Try the Android TV app, a newer TV, or a laptop/streaming stick connected to the TV.');
+        window.__compatFail = true;
+      }
+      setTimeout(function () {
+        if (!window.__booted && !window.__compatFail) show('The game didn\u2019t start. This browser is probably too old (it needs a Chrome 75-level browser with WebGL 2).');
+      }, 20000);
+    })();
+  </script>
+  <script nomodule>window.__compatShow && window.__compatShow('This browser is too old for Topple Party (no JavaScript module support).');</script>
   <script type="module" src="/src/tv/main.ts"></script>
 </body>
 </html>
