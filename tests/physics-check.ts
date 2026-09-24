@@ -1,6 +1,6 @@
 // Headless physics sanity checks: stability of every level, a sample throw, and Tower Pull behaviour.
 import { Sim, initPhysics, pos } from '../src/tv/sim/sim';
-import { LEVELS, TOWER, PRACTICE, buildLevel } from '../src/tv/sim/levels';
+import { LEVELS, PRACTICE, buildLevel } from '../src/tv/sim/levels';
 
 const run = (sim: Sim, secs: number) => { for (let i = 0; i < secs * 60; i++) sim.step(); };
 

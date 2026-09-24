@@ -11,7 +11,8 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "signal": "peerjs --port 9000 --path /",
-    "test:physics": "tsx tests/physics-check.ts && tsx tests/jenga-check.ts"
+    "test:physics": "tsx tests/physics-check.ts && tsx tests/towers-check.ts all --survey",
+    "test:towers": "tsx tests/towers-check.ts all --survey --games 12 --careful 3"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

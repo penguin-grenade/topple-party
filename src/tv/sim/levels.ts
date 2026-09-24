@@ -386,33 +386,6 @@ export const PRACTICE: LevelDef = {
   },
 };
 
-export const JENGA_LAYERS = 14;
-export const JENGA_H = 0.6;
-
-export const TOWER: LevelDef = {
-  id: 'tower',
-  name: 'Tower Pull',
-  blurb: "Pull a block out. Don't let the crown fall!",
-  modes: ['pull'],
-  cam: { pos: [10.6, 10.2, 14.8], look: [0, 5.5, 0] },
-  build(b) {
-    b.plinth(0, 0, 3.8, 3.8, 1);
-    let y = 1;
-    for (let layer = 0; layer < JENGA_LAYERS; layer++) {
-      const alongX = layer % 2 === 0;
-      for (let k = 0; k < 3; k++) {
-        const off = (k - 1) * 1.02;
-        // Every block is the same size and slides freely; the risk is what's left holding the tower up.
-        const h = JENGA_H;
-        if (alongX) b.box('jenga', 0, y, off, 3, h, 1);
-        else b.box('jenga', off, y, 0, 1, h, 3);
-      }
-      y += JENGA_H + 0.003;
-    }
-    b.box('crown', 0, y, 0, 1, 1, 1);
-  },
-};
-
 export function buildLevel(def: LevelDef, seed: number): LevelSpec {
   const b = new Builder();
   def.build(b, mulberry32(seed));

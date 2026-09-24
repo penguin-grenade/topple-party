@@ -282,8 +282,38 @@ function render() {
     const label = MODES.find((m) => m.id === v.mode)?.roundsLabel ?? 'rounds';
     rounds.innerHTML = `<button id="rMinus">−</button><span>${v.rounds} ${label}</span><button id="rPlus">+</button>`;
     hp.appendChild(rounds);
-    rounds.querySelector<HTMLButtonElement>('#rMinus')!.onclick = () => send({ t: 'host', a: 'rounds', n: v.rounds - 1 });
-    rounds.querySelector<HTMLButtonElement>('#rPlus')!.onclick = () => send({ t: 'host', a: 'rounds', n: v.rounds + 1 });
+    // count locally too, so quick double taps add up before the TV's answer arrives
+    let rn = v.rounds;
+    const setRounds = (d: number) => {
+      rn = Math.max(1, Math.min(10, rn + d));
+      rounds.querySelector('span')!.textContent = `${rn} ${label}`;
+      send({ t: 'host', a: 'rounds', n: rn });
+    };
+    rounds.querySelector<HTMLButtonElement>('#rMinus')!.onclick = () => setRounds(-1);
+    rounds.querySelector<HTMLButtonElement>('#rPlus')!.onclick = () => setRounds(1);
+    if (v.mode === 'pull' && v.tower) {
+      // which tower to start on (the game climbs one tower per round from there)
+      const tw = document.createElement('div');
+      tw.className = 'rounds tower';
+      tw.innerHTML = `<button id="tMinus">−</button><span>Start at tower ${v.tower}<small></small></span><button id="tPlus">+</button>`;
+      tw.querySelector('small')!.textContent = v.towerName ?? '';
+      hp.appendChild(tw);
+      const count = v.towerCount ?? v.tower;
+      let tn = v.tower;
+      const minus = tw.querySelector<HTMLButtonElement>('#tMinus')!, plus = tw.querySelector<HTMLButtonElement>('#tPlus')!;
+      const setTower = (d: number) => {
+        tn = Math.max(1, Math.min(count, tn + d));
+        tw.querySelector('span')!.firstChild!.textContent = `Start at tower ${tn}`;
+        tw.querySelector('small')!.textContent = tn === v.tower ? v.towerName ?? '' : '…';
+        minus.disabled = tn <= 1;
+        plus.disabled = tn >= count;
+        send({ t: 'host', a: 'tower', n: tn });
+      };
+      minus.disabled = tn <= 1;
+      plus.disabled = tn >= count;
+      minus.onclick = () => setTower(-1);
+      plus.onclick = () => setTower(1);
+    }
     const start = document.createElement('button');
     start.className = 'start';
     start.textContent = 'START GAME';

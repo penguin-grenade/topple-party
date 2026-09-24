@@ -1,7 +1,11 @@
 import { NetHost, netConfigFromUrl, netConfigToQuery, type Link, type NetConfig } from '../shared/net';
 import { MAX_PLAYERS, MODES, PLAYER_COLORS, PROTOCOL_VERSION, cleanName, type C2S, type ModeId, type PadView, type S2C } from '../shared/protocol';
 import { Sfx } from './audio';
-import { Hud, ICON_SOUND_OFF, ICON_SOUND_ON, LOBBY_FOCUS, type ChipInfo, type LobbyFocus } from './hud';
+import { Hud, ICON_SOUND_OFF, ICON_SOUND_ON, LOBBY_FOCUS, type ChipInfo, type LobbyFocus, type TowerPick } from './hud';
+import { TOWERS } from './sim/towers';
+import { towerSilhouette } from './towerPreview';
+
+const MAX_ROUNDS = 10;
 import { BestShotMode, BlastMode, Mode, PracticeMode, PullMode } from './modes';
 import { Renderer } from './render/renderer';
 import type { LevelSpec } from './sim/levels';
@@ -44,6 +48,8 @@ export class Game {
   mode: Mode;
   selMode: ModeId = 'blast';
   rounds = 3;
+  /** Tower Pull: index of the first tower (the game climbs from there) */
+  towerStart = 0;
   paused = false;
 
   private net: NetHost;
@@ -78,7 +84,8 @@ export class Game {
       }
     })();
     if (MODES.some((m) => m.id === saved.mode)) this.selMode = saved.mode;
-    if (saved.rounds) this.rounds = clamp(saved.rounds, 1, 8);
+    if (saved.rounds) this.rounds = clamp(saved.rounds, 1, MAX_ROUNDS);
+    if (Number.isFinite(saved.tower)) this.towerStart = clamp(saved.tower, 0, TOWERS.length - 1);
   }
 
   async start() {
@@ -146,7 +153,7 @@ export class Game {
       const el = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
       if (!el || this.phase !== 'lobby') return;
       const act = el.dataset.act!;
-      const f: LobbyFocus | null = act === 'mode' ? (`mode${el.dataset.i}` as LobbyFocus) : act.startsWith('rounds') ? 'rounds' : act === 'start' ? 'start' : null;
+      const f: LobbyFocus | null = act === 'mode' ? (`mode${el.dataset.i}` as LobbyFocus) : act.startsWith('rounds') ? 'rounds' : act.startsWith('tower') ? 'tower' : act === 'start' ? 'start' : null;
       if (f && f !== this.lobbyFocus) {
         this.lobbyFocus = f;
         this.uiTimer = 0;
@@ -179,9 +186,16 @@ export class Game {
       case 'rounds-':
       case 'rounds+':
         if (this.phase !== 'lobby') return;
-        this.rounds = clamp(this.rounds + (act === 'rounds+' ? 1 : -1), 1, 8);
+        this.rounds = clamp(this.rounds + (act === 'rounds+' ? 1 : -1), 1, MAX_ROUNDS);
         this.lobbyFocus = 'rounds';
         this.sfx.blip(act === 'rounds+');
+        break;
+      case 'tower-':
+      case 'tower+':
+        if (this.phase !== 'lobby') return;
+        this.towerStart = clamp(this.towerStart + (act === 'tower+' ? 1 : -1), 0, TOWERS.length - 1);
+        this.lobbyFocus = 'tower';
+        this.sfx.blip(act === 'tower+');
         break;
       case 'start':
         if (this.phase === 'lobby') this.startGame();
@@ -289,6 +303,16 @@ export class Game {
     this.pushViews();
   }
 
+  /** What the lobby's tower picker shows: the first tower and the towers this game will climb through. */
+  private towerPick(): TowerPick {
+    const first = this.towerStart + 1;
+    const last = Math.min(TOWERS.length, first + this.rounds - 1);
+    const extra = first + this.rounds - 1 - last;
+    let plan = this.rounds === 1 ? 'Just this tower' : `Plays towers ${first}–${last}`;
+    if (extra > 0) plan += `, then ${TOWERS[TOWERS.length - 1].name} ${extra === 1 ? 'again' : `${extra} more times`}`;
+    return { n: first, count: TOWERS.length, name: TOWERS[this.towerStart].name, plan, svg: towerSilhouette(this.towerStart) };
+  }
+
   startGame() {
     const active = this.players.filter((p) => p.connected);
     if (!active.length) {
@@ -296,7 +320,7 @@ export class Game {
       return;
     }
     try {
-      localStorage.setItem('topple.tv', JSON.stringify({ mode: this.selMode, rounds: this.rounds }));
+      localStorage.setItem('topple.tv', JSON.stringify({ mode: this.selMode, rounds: this.rounds, tower: this.towerStart }));
     } catch {
       /* ignore */
     }
@@ -525,7 +549,13 @@ export class Game {
         break;
       case 'rounds':
         if (this.phase === 'lobby') {
-          this.rounds = clamp(Math.round(m.n), 1, 8);
+          this.rounds = clamp(Math.round(m.n), 1, MAX_ROUNDS);
+          this.sfx.blip(true);
+        }
+        break;
+      case 'tower':
+        if (this.phase === 'lobby') {
+          this.towerStart = clamp(Math.round(m.n) - 1, 0, TOWERS.length - 1);
           this.sfx.blip(true);
         }
         break;
@@ -545,6 +575,7 @@ export class Game {
         this.resume();
         break;
     }
+    this.uiTimer = 0; // redraw the lobby right away
     this.pushViews();
   }
 
@@ -696,7 +727,7 @@ export class Game {
       this.refreshTools();
       if (this.phase === 'lobby') {
         const connected = this.players.filter((p) => p.connected).length;
-        this.hud.renderLobby(this.selMode, this.rounds, this.lobbyFocus, this.host()?.name ?? null, connected);
+        this.hud.renderLobby(this.selMode, this.rounds, this.lobbyFocus, this.host()?.name ?? null, connected, this.selMode === 'pull' ? this.towerPick() : null);
       }
       // stale players: phones that stopped pinging
       for (const p of this.players) {
@@ -772,6 +803,9 @@ export class Game {
         host: p === h,
         mode: this.selMode,
         rounds: this.rounds,
+        tower: this.towerStart + 1,
+        towerName: TOWERS[this.towerStart].name,
+        towerCount: TOWERS.length,
         score: p.score,
         rank: ranks?.get(p.id),
         cooldown: this.mode.cooldown(p),
@@ -826,15 +860,21 @@ export class Game {
       return;
     }
     if (this.phase === 'lobby') {
-      let i = LOBBY_FOCUS.indexOf(this.lobbyFocus);
+      // the tower picker only exists in Tower Pull
+      const order = LOBBY_FOCUS.filter((f) => f !== 'tower' || this.selMode === 'pull');
+      let i = Math.max(0, order.indexOf(this.lobbyFocus));
       if (up) i = Math.max(0, i - 1);
-      if (down) i = Math.min(LOBBY_FOCUS.length - 1, i + 1);
+      if (down) i = Math.min(order.length - 1, i + 1);
       if (up || down) {
-        this.lobbyFocus = LOBBY_FOCUS[i];
+        this.lobbyFocus = order[i];
         this.sfx.blip(up);
       }
       if (this.lobbyFocus === 'rounds' && (left || right)) {
-        this.rounds = clamp(this.rounds + (right ? 1 : -1), 1, 8);
+        this.rounds = clamp(this.rounds + (right ? 1 : -1), 1, MAX_ROUNDS);
+        this.sfx.blip(right);
+        this.pushViews();
+      } else if (this.lobbyFocus === 'tower' && (left || right)) {
+        this.towerStart = clamp(this.towerStart + (right ? 1 : -1), 0, TOWERS.length - 1);
         this.sfx.blip(right);
         this.pushViews();
       } else if ((left || right) && this.lobbyFocus.startsWith('mode')) {

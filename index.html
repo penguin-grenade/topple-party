@@ -50,6 +50,13 @@
   #roundsRow { display: flex; align-items: center; justify-content: center; gap: .8rem; font-size: 1.5rem; padding: .6rem; border-radius: 1rem; background: #ffffff12; }
   #roundsRow b { font-size: 2rem; color: var(--gold); }
   #roundsRow .arrow { opacity: .6; font-size: 1.2rem; }
+  #towerRow { display: flex; align-items: center; gap: .7rem; padding: .5rem .7rem; border-radius: 1rem; background: #ffffff12; }
+  #towerRow .tSil { width: 3.4rem; height: 4.2rem; flex: none; }
+  #towerRow .tTxt { flex: 1; font-size: 1.15rem; line-height: 1.25; color: var(--muted); }
+  #towerRow .tTxt b { color: var(--gold); font-size: 1.35rem; }
+  #towerRow .tName { color: #fff; font-size: 1.55rem; font-weight: 700; }
+  #towerRow small { font-size: .95rem; }
+  #towerRow .arrow { opacity: .6; font-size: 1.2rem; padding: 0 .4rem; }
   #startBtn { text-align: center; font-size: 2.3rem; font-weight: 700; padding: .8rem; border-radius: 999px; background: #33c46a; box-shadow: 0 .45rem 0 #1f8546; }
   #startBtn.disabled { background: #6b6680; box-shadow: 0 .45rem 0 #45405a; }
   #hostHint { text-align: center; color: var(--muted); font-size: 1.05rem; line-height: 1.3; }
@@ -178,6 +185,7 @@
         <div class="panelTitle">Game mode</div>
         <div id="modes"></div>
         <div id="roundsRow"></div>
+        <div id="towerRow" class="hidden"></div>
         <div id="startBtn" data-act="start">START</div>
         <div id="hostHint"></div>
       </div>

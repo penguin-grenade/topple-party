@@ -74,6 +74,8 @@ export interface SimOptions {
   autoScore: boolean;
   /** extra physics substeps per frame for tall stacks */
   substeps: number;
+  /** contact stiffness in Hz (Rapier's default is 30); stiffer contacts keep tall towers from sagging */
+  contactHz?: number;
 }
 
 let RAPIER_READY: Promise<void> | null = null;
@@ -95,8 +97,15 @@ export class Sim {
   opts: SimOptions = { autoScore: true, substeps: 1 };
   private booms: PendingBoom[] = [];
   grab: Grab | null = null;
-  /** Tower Pull grab strength: spring (N/m), damping (N·s/m), max force (N) */
-  grabTuning = { K: 400, C: 40, FMAX: 300 };
+  /**
+   * Tower Pull grab: the piece chases the player's target at up to `vmax` m/s (speed = `gain` x
+   * distance to go). Along its length it pushes as hard as it takes (up to `fmax` N), so even a
+   * piece carrying half the tower slides; sideways it only nudges (`fside`), so wiggling never
+   * shoves the neighbours.
+   */
+  grabTuning = { gain: 7, vmax: 4.5, fmax: 6000, fside: 60 };
+  /** built-up pulling effort (N) while a stuck piece lags behind the hand */
+  private grabEffort = 0;
   /** total points still on the stands (for "level cleared") */
   paused = false;
 
@@ -117,6 +126,7 @@ export class Sim {
     this.level = spec;
     this.opts = { autoScore: true, substeps: 1, ...opts };
     this.world.timestep = DT / this.opts.substeps;
+    if (this.opts.contactHz) this.world.integrationParameters.contact_natural_frequency = this.opts.contactHz;
     // floating island
     const island = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.6, 0));
     this.world.createCollider(RAPIER.ColliderDesc.cylinder(0.6, ISLAND_R).setFriction(0.9).setRestitution(0.05), island);
@@ -329,6 +339,7 @@ export class Sim {
     const p = pos(ent);
     const side = v3(-axis.z, 0, axis.x);
     this.grab = { ent, anchor: p, axis, side, target: { ...p } };
+    this.grabEffort = 0;
     ent.body.setAngularDamping(8);
     ent.body.setLinearDamping(1.5);
     ent.body.wakeUp();
@@ -359,15 +370,24 @@ export class Sim {
     if (!g || g.ent.gone) return;
     const p = g.ent.body.translation();
     const v = g.ent.body.linvel();
-    const { K, C, FMAX } = this.grabTuning;
-    let fx = K * (g.target.x - p.x) - C * v.x;
-    let fz = K * (g.target.z - p.z) - C * v.z;
-    const f = Math.hypot(fx, fz);
-    if (f > FMAX) {
-      fx *= FMAX / f;
-      fz *= FMAX / f;
-    }
-    g.ent.body.applyImpulse(v3(fx * dt, 0, fz * dt), true);
+    const m = g.ent.body.mass();
+    const { gain, vmax, fmax, fside } = this.grabTuning;
+    const ax = g.axis, sd = g.side;
+    // split everything into along-the-piece and sideways parts
+    const ex = g.target.x - p.x, ez = g.target.z - p.z;
+    const eAlong = ex * ax.x + ez * ax.z, eSide = ex * sd.x + ez * sd.z;
+    const vAlong = v.x * ax.x + v.z * ax.z, vSide = v.x * sd.x + v.z * sd.z;
+    const want = Math.max(-vmax, Math.min(vmax, eAlong * gain));
+    const wantSide = Math.max(-1, Math.min(1, eSide * gain));
+    // speed control: a quick push toward the wanted speed, plus effort that keeps building while a
+    // loaded piece lags behind (and drains fast once it catches up), capped by how hard a hand pulls
+    const cap = (f: number, c: number) => Math.max(-c, Math.min(c, f));
+    const lag = want - vAlong;
+    const k = lag * this.grabEffort < 0 ? 40 : 12; // unwind faster than it winds up
+    this.grabEffort = cap(this.grabEffort + lag * m * k * 60 * dt, fmax);
+    const iAlong = cap(m * lag * 25 + this.grabEffort, fmax) * dt;
+    const iSide = cap(m * (wantSide - vSide) * 25, fside) * dt;
+    g.ent.body.applyImpulse(v3(ax.x * iAlong + sd.x * iSide, 0, ax.z * iAlong + sd.z * iSide), true);
   }
 
   // ---------------------------------------------------------------- stepping
@@ -494,6 +514,17 @@ export class Sim {
       }
       frontier = next;
     }
+  }
+
+  /**
+   * Wake everything at once and let it come to rest. Blocks are created asleep with a hair of space
+   * between them; left alone, a tall stack wakes one body at a time and visibly slumps before it
+   * springs back. Waking it all together settles it in a few frames (Tower Pull does this at build).
+   */
+  settle(frames: number) {
+    for (const e of this.ents) e.body.wakeUp();
+    for (let i = 0; i < frames; i++) this.step();
+    this.events = this.events.filter((ev) => ev.e !== 'hit');
   }
 
   // ---------------------------------------------------------------- queries

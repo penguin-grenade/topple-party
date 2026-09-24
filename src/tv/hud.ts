@@ -34,8 +34,19 @@ export const ICON_SOUND_ON =
 export const ICON_SOUND_OFF =
   '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M16 9l6 6M22 9l-6 6"/></svg>';
 
-export type LobbyFocus = 'mode0' | 'mode1' | 'mode2' | 'rounds' | 'start';
-export const LOBBY_FOCUS: LobbyFocus[] = ['mode0', 'mode1', 'mode2', 'rounds', 'start'];
+export type LobbyFocus = 'mode0' | 'mode1' | 'mode2' | 'rounds' | 'tower' | 'start';
+export const LOBBY_FOCUS: LobbyFocus[] = ['mode0', 'mode1', 'mode2', 'rounds', 'tower', 'start'];
+
+/** Tower Pull's tower picker, as the lobby shows it. */
+export interface TowerPick {
+  /** 1-based number of the first tower */
+  n: number;
+  count: number;
+  name: string;
+  /** what the game will play, e.g. "Towers 3–5" */
+  plan: string;
+  svg: string;
+}
 
 export class Hud {
   private reticleEls = new Map<number, HTMLElement>();
@@ -65,7 +76,7 @@ export class Hud {
     document.body.classList.toggle('in-lobby', on);
   }
 
-  renderLobby(mode: ModeId, rounds: number, focus: LobbyFocus, hostName: string | null, playerCount: number) {
+  renderLobby(mode: ModeId, rounds: number, focus: LobbyFocus, hostName: string | null, playerCount: number, tower: TowerPick | null) {
     const modes = $('modes');
     modes.innerHTML = MODES.map(
       (m, i) => `<div class="modeCard ${m.id === mode ? 'sel' : ''} ${focus === `mode${i}` ? 'focus' : ''}" data-act="mode" data-i="${i}">
@@ -76,6 +87,13 @@ export class Hud {
     const rr = $('roundsRow');
     rr.innerHTML = `<span class="arrow" data-act="rounds-">◀</span><b>${rounds}</b> ${label}<span class="arrow" data-act="rounds+">▶</span>`;
     rr.classList.toggle('focus', focus === 'rounds');
+    const tr = $('towerRow');
+    tr.classList.toggle('hidden', !tower);
+    if (tower) {
+      const html = `<span class="arrow" data-act="tower-">◀</span>${tower.svg}<div class="tTxt">Start at tower <b>${tower.n}</b> of ${tower.count}<div class="tName">${esc(tower.name)}</div><small>${esc(tower.plan)}</small></div><span class="arrow" data-act="tower+">▶</span>`;
+      if (tr.innerHTML !== html) tr.innerHTML = html;
+      tr.classList.toggle('focus', focus === 'tower');
+    }
     const sb = $('startBtn');
     sb.classList.toggle('focus', focus === 'start');
     sb.classList.toggle('disabled', playerCount === 0);

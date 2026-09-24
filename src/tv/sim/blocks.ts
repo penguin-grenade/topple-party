@@ -11,6 +11,7 @@ export type BlockType =
   | 'ice'
   | 'ghost'
   | 'jenga'
+  | 'jgold'
   | 'crown';
 
 export interface BlockTypeDef {
@@ -35,6 +36,7 @@ export const BLOCK_TYPES: Record<BlockType, BlockTypeDef> = {
   ice: { points: 2, density: 0.9, friction: 0.03, restitution: 0.02, label: 'Ice' },
   ghost: { points: 2, density: 0.5, friction: 0.6, restitution: 0.05, label: 'Ghost' },
   jenga: { points: 0, density: 0.8, friction: 0.3, restitution: 0.0, label: 'Tower block' },
+  jgold: { points: 0, density: 0.8, friction: 0.3, restitution: 0.0, label: 'Gold tower block' },
   crown: { points: 0, density: 0.6, friction: 0.6, restitution: 0.0, label: 'Crown' },
 };
 

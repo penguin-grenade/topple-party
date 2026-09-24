@@ -35,6 +35,8 @@ export class Renderer {
   zoom = 1;
   private liftNow = 0;
   private zoomNow = 1;
+  /** how far the players may move the camera (set per tower in Tower Pull) */
+  camLimits: { liftMin: number; liftMax: number; zoomMin: number; zoomMax: number } | null = null;
   /** how quickly the camera follows its target (higher = snappier, for hands-on control) */
   camRate = 2.6;
   private trees: THREE.Mesh[] = [];
@@ -155,7 +157,7 @@ export class Renderer {
   }
 
   /** Move the camera around the current level: yaw in radians, lift in world units, zoom as a factor delta. */
-  nudgeCamera(dYaw: number, dLift: number, dZoom: number, limits = { liftMin: -4, liftMax: 4.5, zoomMin: 0.55, zoomMax: 1.25 }) {
+  nudgeCamera(dYaw: number, dLift: number, dZoom: number, limits = this.camLimits ?? { liftMin: -4, liftMax: 4.5, zoomMin: 0.55, zoomMax: 1.25 }) {
     this.orbit += dYaw;
     this.lift = Math.max(limits.liftMin, Math.min(limits.liftMax, this.lift + dLift));
     this.zoom = Math.max(limits.zoomMin, Math.min(limits.zoomMax, this.zoom + dZoom));

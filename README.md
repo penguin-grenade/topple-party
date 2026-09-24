@@ -17,10 +17,33 @@ of a wobbly tower without toppling it.
 | --- | --- | --- |
 | **Blast Party** | Everyone at once | Timed levels. Knock blocks off their stands; whoever's ball knocked it gets the points. Gold = 10, Gem = 25, Skull = −10. |
 | **Best Shot** | Take turns | Everyone gets 3 balls on an identical copy of the level. Biggest topple wins the round. |
-| **Tower Pull** | Take turns | Jenga-style. Aim at a block, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every block slides out, so the physics is the challenge: pull the wrong one (like a side block from a layer that's already missing its middle) and the tower goes over. There's no time limit, but you can't pass: your turn only ends when a block comes all the way out. Drop the crown and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
+| **Tower Pull** | Take turns | Jenga-style, on ten towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. Deeper pieces score more, long pieces +3, **gold** pieces +15. Topple it (or drop a crown) and you lose 15 points. On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
 
 Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explode when two touch),
 **ghost** blocks (vanish when hit), **ice** (slippery), **stone** (heavy).
+
+### The towers
+
+In the lobby, Tower Pull shows a **Start at tower** picker (TV remote ◀ ▶, or the host's phone).
+A game plays one tower per round, climbing from the one you pick: "3 towers" from tower 4 plays
+towers 4, 5 and 6.
+
+| # | Tower | What makes it tricky |
+| --- | --- | --- |
+| 1 | **Classic** | Three across, fourteen high. |
+| 2 | **Four Square** | Four across, eighteen high, longer pieces. More choices, and your first gold piece. |
+| 3 | **Ziggurat** | Steps of long, medium and short pieces: solid below, a skinny two-wide top. |
+| 4 | **Lighthouse** | A skinny tower holding up a heavy gallery of extra-long pieces that overhang every side. |
+| 5 | **Twister** | Every layer turns 30°, so every piece slides a different way. You'll need the camera. |
+| 6 | **Leaning Tower** | Leans hard, balanced by long counterweights sticking out the back. The low side holds it up. |
+| 7 | **The Scales** | A see-saw on a one-piece pivot with a crowned pan on each end. Take from one pan and the other gets heavy. |
+| 8 | **The Gate** | Two skinny legs that only stand because the long bridges tie them together. |
+| 9 | **The Arch** | Two towers leaning so far in that neither could stand alone. Watch their feet. |
+| 10 | **The Colossus** | 115 pieces, 22 high: wide foundation, see-through window, a neck leaning out, a balcony with a second crown, and a twisted spire leaning back. |
+
+Each tower was tuned headlessly: it has to stand on its own, every piece has to slide out, and
+bot playtests check the difficulty climbs. A careless player (random pieces) topples Classic after
+about 8 pulls and the Colossus after about 3; a careful one lasts roughly 12–30 pulls on any of them.
 
 ## Controls (phone)
 
@@ -29,10 +52,11 @@ Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explod
   (Holding it upright like a camera works too; re-center in that grip.)
 * **Throw:** hold the big button and flick your wrist toward the TV. Harder flick = faster ball.
   A quick tap lobs a gentle ball.
-* **Grab (Tower Pull):** hold **GRAB** on a block, then slide your thumb (or tilt the phone) the
-  way you want the block to go, as seen on the TV: down/back = toward you, up = away, left/right =
-  left/right. Blocks only slide along their length; arrows on the TV show the two ways the grabbed
-  block can move.
+* **Grab (Tower Pull):** hold **GRAB** on a piece, then slide your thumb (or tilt the phone) the
+  way you want the piece to go, as seen on the TV: down/back = toward you, up = away, left/right =
+  left/right. Pieces only slide along their length (on the Twister that's a different way every
+  layer); arrows on the TV show the two ways the grabbed piece can move. Longer pieces move further
+  for the same thumb slide.
   Use the **camera pad** above the button to get a better angle first. On the TV remote, the
   arrow keys move the camera too.
 * No motion sensors? ⚙ → **Aiming: Touch pad**, then drag to aim and hold-and-release to throw.
@@ -130,7 +154,11 @@ npm run dev          # http://localhost:5173
   TV GPUs smooth.
 * `npm run build` type-checks and outputs the static site to `dist/`.
 * `npm run test:physics` runs headless physics checks: every level must stand still when untouched,
-  sample throws, and Tower Pull block-pulling behaviour.
+  sample throws, and every Tower Pull tower must stand on its own with every piece able to slide out.
+* `npm run test:towers` adds bot playtests of each tower (slow: around 20 minutes). `tests/towers-check.ts`
+  is a small tower lab: pass tower ids or numbers, `--survey` (which first pulls topple it),
+  `--games N` (random-pull bots), `--careful N` (bots that test before they pull). Try new designs
+  in `tests/tower-variants.ts` before adding them to the game.
 
 ### Project layout
 
@@ -140,6 +168,7 @@ p/index.html          phone controller page
 src/shared/           protocol, networking (PeerJS / BroadcastChannel), QR encoder
 src/controller/       phone: motion.ts (pointer + flick detection), main.ts (UI)
 src/tv/sim/           physics (Rapier): blocks, levels, explosions, scoring, Tower Pull grab
+src/tv/sim/towers.ts  the ten Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
 src/tv/render/        three.js scene, procedural textures, particles
 src/tv/game.ts        players, lobby, networking glue, TV remote input
 src/tv/modes.ts       Practice, Blast Party, Best Shot, Tower Pull
@@ -150,6 +179,11 @@ android/              Android TV app (WebView wrapper, Gradle project)
 Adding a level: add an entry to `LEVELS` in `src/tv/sim/levels.ts`. Builders like `b.plinth`,
 `b.column`, `b.row`, `b.pyramid` and `b.pyramid3d` place blocks; anything that falls below its
 stand's top scores.
+
+Adding a tower: add an entry to `TOWERS` in `src/tv/sim/towers.ts`. `layer(b, y, { n, len, ang, cx, cz, skip, gold })`
+lays `n` pieces of length `len` side by side, running along `ang` (any angle), and returns the top.
+The camera frames each tower automatically. Run `tsx tests/towers-check.ts <id> --survey --games 12`
+to check it.
 
 ## Android app details
 

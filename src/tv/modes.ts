@@ -1,7 +1,9 @@
 import type { PadView } from '../shared/protocol';
 import type { Game, Player } from './game';
 import { BLOCK_TYPES, isPrize, type BlockType } from './sim/blocks';
-import { buildLevel, levelsFor, PRACTICE, TOWER, JENGA_LAYERS, JENGA_H, type LevelDef } from './sim/levels';
+import { buildLevel, levelsFor, PRACTICE, type LevelDef } from './sim/levels';
+import { TOWERS, TOWER_CONTACT_HZ, frameTower, type TowerDef } from './sim/towers';
+import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, pullReach, toppled } from './sim/pull';
 import * as THREE from 'three';
 import { pos, type Entity, type SimEvent, type V3 } from './sim/sim';
 
@@ -367,8 +369,14 @@ export class BestShotMode extends Mode {
 }
 
 // =============================================================================== Tower Pull (turns)
+/** The tower for round `i` of a game that starts at tower `start` (past the last one, it stays there). */
+export function towerFor(start: number, i: number): TowerDef {
+  return TOWERS[Math.max(0, Math.min(TOWERS.length - 1, start + i))];
+}
+
 export class PullMode extends Mode {
   private tower = 0;
+  private def: TowerDef = TOWERS[0];
   private turnCount = 0;
   private active: Player | null = null;
   private phase: 'build' | 'intro' | 'turn' | 'check' | 'toppled' = 'build';
@@ -382,6 +390,9 @@ export class PullMode extends Mode {
   private hover: Entity | null = null;
   private checkMsg = '';
   private creakT = 0;
+  /** height range of the tower's pieces when built (lower pieces are worth more) */
+  private lowY = 0;
+  private highY = 1;
 
   start() {
     this.game.renderer.camRate = 7; // snappy: the active player steers it
@@ -389,14 +400,25 @@ export class PullMode extends Mode {
   }
   dispose() {
     this.game.renderer.camRate = 2.6;
+    this.game.renderer.camLimits = null;
   }
   private buildTower() {
     const g = this.game;
-    g.loadLevel(buildLevel(TOWER, seed()), { autoScore: false, substeps: 2 });
+    this.def = towerFor(g.towerStart, this.tower);
+    const spec = buildLevel(this.def, seed());
+    const frame = frameTower(spec, this.def.yaw);
+    spec.cam = frame.cam;
+    g.loadLevel(spec, { autoScore: false, substeps: this.def.substeps, contactHz: TOWER_CONTACT_HZ });
+    // wake it all at once so it settles gently instead of slumping as it wakes body by body
+    g.sim.settle(30);
+    g.renderer.camLimits = frame.limits;
+    const ys = g.sim.blocks().filter(isPiece).map((e) => e.home.y);
+    this.lowY = Math.min(...ys);
+    this.highY = Math.max(this.lowY + 0.1, ...ys);
     this.phase = 'build';
     this.t = 0;
     this.grabbed = null;
-    g.hud.banner(`Tower ${this.tower + 1} of ${g.rounds}`, "Pull blocks out. Don't drop the crown!", '#ffd23f', 2400);
+    g.hud.banner(`Tower ${this.tower + 1} of ${g.rounds}: ${this.def.name}`, this.def.blurb, '#ffd23f', 3500);
     g.pushViews();
   }
   private nextTurn() {
@@ -425,13 +447,7 @@ export class PullMode extends Mode {
     for (const e of this.game.sim.blocks()) this.snapshot.set(e, pos(e));
   }
   private collapsed(): boolean {
-    for (const [e, p0] of this.snapshot) {
-      if (e.gone || e === this.grabbed) continue;
-      const p = pos(e);
-      const d = Math.hypot(p.x - p0.x, p.y - p0.y, p.z - p0.z);
-      if (d > 0.85 || (e.type === 'crown' && p0.y - p.y > 0.45)) return true;
-    }
-    return false;
+    return !!toppled(this.snapshot, this.grabbed);
   }
   private movement(): number {
     let m = 0;
@@ -442,13 +458,19 @@ export class PullMode extends Mode {
     }
     return m;
   }
+  /** Points for pulling a piece out: deeper is harder; long and gold pieces pay extra. */
+  pieceValue(e: Entity): number {
+    const depth = (this.highY - e.home.y) / (this.highY - this.lowY);
+    return 5 + Math.round(13 * Math.max(0, Math.min(1, depth))) + (pieceLength(e) >= 5 ? 3 : 0) + (e.type === 'jgold' ? 15 : 0);
+  }
 
   update(dt: number) {
     this.t += dt;
     const g = this.game;
     switch (this.phase) {
       case 'build':
-        if (this.t > 2.2) this.nextTurn();
+        // long enough to read the new tower's name and description
+        if (this.t > 3.6) this.nextTurn();
         break;
       case 'intro':
         if (this.t > 1.6) {
@@ -463,22 +485,22 @@ export class PullMode extends Mode {
         this.updateHover();
         if (this.grabbed && !this.grabbed.gone) {
           const e = this.grabbed;
-          const p = pos(e);
-          const out = (p.x - e.home.x) * this.grabAxis.x + (p.z - e.home.z) * this.grabAxis.z;
+          const out = outDistance(e, this.grabAxis);
           const moving = Math.hypot(e.body.linvel().x, e.body.linvel().z);
           this.creakT -= dt;
           if (moving > 0.3 && this.creakT <= 0) {
             g.sfx.creak();
             this.creakT = 0.35;
           }
-          if (Math.abs(out) > 2.15) this.pulledOut(e);
+          if (Math.abs(out) > outThreshold(e)) this.pulledOut(e);
         }
         if (this.collapsed()) this.topple();
         break;
       }
       case 'check':
         if (this.collapsed()) this.topple();
-        else if (this.t > 2.4 && this.movement() < 0.2) this.nextTurn();
+        // wait for the tower to settle (but never forever: a big tower can keep trembling)
+        else if (this.t > 2.4 && (this.movement() < 0.2 || this.t > 9)) this.nextTurn();
         break;
       case 'toppled':
         if (this.t > 4.8) {
@@ -496,7 +518,7 @@ export class PullMode extends Mode {
     const a = this.active;
     if (!a || this.grabbed) return;
     const hit = this.game.pick(a.aimShown.x, a.aimShown.y);
-    const e = hit?.ent && hit.ent.type === 'jenga' ? hit.ent : null;
+    const e = hit?.ent && isPiece(hit.ent) ? hit.ent : null;
     if (e !== this.hover) {
       this.hover = e;
       this.game.renderer.setOutline(e, '#ffffff');
@@ -506,11 +528,10 @@ export class PullMode extends Mode {
   private pulledOut(e: Entity) {
     const g = this.game;
     const a = this.active!;
-    const layer = Math.round((e.home.y - 1 - JENGA_H / 2) / (JENGA_H + 0.003));
-    const pts = 5 + Math.max(0, JENGA_LAYERS - 1 - layer);
+    const pts = this.pieceValue(e);
     g.sim.grabEnd();
     const p = pos(e);
-    g.renderer.fx.poof(p, '#f4d29b', 10);
+    g.renderer.fx.poof(p, e.type === 'jgold' ? '#ffd23f' : '#f4d29b', 10);
     g.renderer.fx.sparkle(p, a.color, 16);
     g.sim.remove(e);
     g.renderer.setOutline(null);
@@ -556,12 +577,11 @@ export class PullMode extends Mode {
     p.aim = { x, y };
     const hit = g.pick(x, y);
     const e = hit?.ent;
-    if (!e || e.type !== 'jenga' || e.gone) {
+    if (!e || !isPiece(e)) {
       g.buzz(p, [20, 40, 20]);
       return;
     }
-    const alongX = e.size.x > e.size.z;
-    this.grabAxis = alongX ? { x: 1, y: 0, z: 0 } : { x: 0, y: 0, z: 1 };
+    this.grabAxis = pieceAxis(e);
     // The player steers in screen terms (thumb down / tilt back = toward me, left/right = screen
     // left/right). Freeze the camera's horizontal basis now so moving the camera mid-pull can't
     // yank the block somewhere else.
@@ -585,7 +605,7 @@ export class PullMode extends Mode {
   onPull(p: Player, d: number, s: number) {
     if (p !== this.active || !this.grabbed) return;
     const t = this.grabToward, r = this.grabRight;
-    const k = 2.6;
+    const k = pullReach(this.grabbed);
     this.game.sim.grabOffset((t.x * d + r.x * s) * k, (t.z * d + r.z * s) * k);
   }
   onRelease(p: Player) {
@@ -621,7 +641,7 @@ export class PullMode extends Mode {
   }
   hud(): HudPart {
     const a = this.active;
-    const left = `<b>Tower ${this.tower + 1}/${this.game.rounds}</b> · Tower Pull`;
+    const left = `<b>Tower ${this.tower + 1}/${this.game.rounds}</b> · ${this.def.name}`;
     if (!a || this.phase === 'build') return { left, center: '' };
     return {
       left,

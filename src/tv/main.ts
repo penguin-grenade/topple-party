@@ -1,6 +1,7 @@
 import { Game } from './game';
 import { initPhysics } from './sim/sim';
-import { LEVELS, PRACTICE, TOWER, buildLevel } from './sim/levels';
+import { LEVELS, PRACTICE, buildLevel } from './sim/levels';
+import { TOWERS } from './sim/towers';
 
 async function boot() {
   if ((window as any).__compatFail) return; // the inline check already explained what's missing
@@ -12,7 +13,7 @@ async function boot() {
     await initPhysics();
     const game = new Game(canvas);
     (window as any).__game = game;
-    Object.assign(window as any, { __levels: [...LEVELS, PRACTICE, TOWER], __buildLevel: buildLevel });
+    Object.assign(window as any, { __levels: [...LEVELS, PRACTICE, ...TOWERS], __towers: TOWERS, __buildLevel: buildLevel });
     game.begin();
     (window as any).__booted = true;
     keepAwake();

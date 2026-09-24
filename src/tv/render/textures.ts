@@ -84,6 +84,10 @@ function draw(type: BlockType): HTMLCanvasElement {
       grain(g, '#f4d29b', '#b98a4a', 3, 20);
       border(g, '#d9ad6c', 8);
       break;
+    case 'jgold':
+      grain(g, '#ffd23f', '#c98a00', 3, 20);
+      border(g, '#e0a000', 8);
+      break;
     case 'stone': {
       g.fillStyle = '#a6afbb';
       g.fillRect(0, 0, S, S);
@@ -298,6 +302,7 @@ export function blockMaterial(type: BlockType, maxAniso = 4): THREE.Material {
       break;
     case 'gold':
     case 'crown':
+    case 'jgold':
       m = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.5, roughness: 0.3, emissive: new THREE.Color('#ffae00'), emissiveIntensity: 0.12 });
       break;
     case 'gem':
