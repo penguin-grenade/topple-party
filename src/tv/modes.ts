@@ -366,15 +366,12 @@ export class BestShotMode extends Mode {
 }
 
 // =============================================================================== Tower Pull (turns)
-const TURN_TIME = 30;
-
 export class PullMode extends Mode {
   private tower = 0;
   private turnCount = 0;
   private active: Player | null = null;
   private phase: 'build' | 'intro' | 'turn' | 'check' | 'toppled' = 'build';
   private t = 0;
-  private turnT = 0;
   private snapshot = new Map<Entity, V3>();
   private grabbed: Entity | null = null;
   private grabAxis: V3 = { x: 1, y: 0, z: 0 };
@@ -409,7 +406,6 @@ export class PullMode extends Mode {
     this.turnCount++;
     this.phase = 'intro';
     this.t = 0;
-    this.turnT = 0;
     this.grabbed = null;
     this.hover = null;
     g.renderer.setOutline(null);
@@ -459,7 +455,7 @@ export class PullMode extends Mode {
         }
         break;
       case 'turn': {
-        this.turnT += dt;
+        // No time limit: the turn only ends when a block comes all the way out (or the tower falls).
         this.updateHover();
         if (this.grabbed && !this.grabbed.gone) {
           const e = this.grabbed;
@@ -474,14 +470,6 @@ export class PullMode extends Mode {
           if (Math.abs(out) > 2.15) this.pulledOut(e);
         }
         if (this.collapsed()) this.topple();
-        else if (this.turnT > TURN_TIME) {
-          this.release();
-          this.checkMsg = "Time's up!";
-          g.hud.banner("Time's up!", 'No points this turn', '#ffffff', 1600);
-          this.phase = 'check';
-          this.t = 0;
-          g.pushViews();
-        }
         break;
       }
       case 'check':
@@ -631,8 +619,7 @@ export class PullMode extends Mode {
     return {
       left,
       center: `<span style="color:${a.color}">${a.name}</span>`,
-      sub: this.phase === 'turn' ? `${Math.max(0, Math.ceil(TURN_TIME - this.turnT))}s` : '',
-      urgent: this.phase === 'turn' && TURN_TIME - this.turnT < 8,
+      sub: this.phase === 'turn' ? 'must pull a block out' : '',
     };
   }
 }
