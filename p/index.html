@@ -9,6 +9,7 @@
 <title>Topple Party · Controller</title>
 <link rel="icon" href="/icon.svg" />
 <link rel="apple-touch-icon" href="/icon-192.png" />
+<link rel="manifest" href="/pad.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -29,6 +30,10 @@
   }
   button { font: inherit; color: inherit; cursor: pointer; }
   .hidden { display: none !important; }
+  /* #app always has a transform, so the fixed-position screens below are laid out inside it.
+     When the phone rotates to landscape and the browser can't lock orientation, #app is turned back
+     so the controller stays upright in the player's hand. */
+  #app { position: fixed; left: 50%; top: 50%; width: 100vw; height: 100vh; transform: translate(-50%, -50%); overflow: hidden; container-type: size; }
   .screen { position: fixed; inset: 0; display: flex; flex-direction: column; padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom)); }
 
   /* ---------- join ---------- */
@@ -36,12 +41,12 @@
   .logo { font-weight: 700; font-size: 52px; line-height: .9; letter-spacing: 1px; color: #fff;
     text-shadow: 0 4px 0 #1b1238, 0 0 24px #a66cff88; margin-bottom: 10px; transform: rotate(-3deg); }
   .logo span { color: #ffd23f; }
-  #join label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; color: var(--muted); width: min(320px, 90vw); text-align: left; }
+  #join label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; color: var(--muted); width: min(320px, 90vw); width: min(320px, 90cqw); text-align: left; }
   #join input { font: inherit; font-size: 26px; font-weight: 700; padding: 12px 16px; border-radius: 16px; border: 3px solid #ffffff22;
     background: #0004; color: #fff; outline: none; width: 100%; }
   #join input:focus { border-color: #ffd23f; }
   #code { letter-spacing: 10px; text-transform: uppercase; text-align: center; }
-  #joinBtn { margin-top: 8px; width: min(320px, 90vw); font-size: 30px; font-weight: 700; padding: 16px; border: 0; border-radius: 999px;
+  #joinBtn { margin-top: 8px; width: min(320px, 90vw); width: min(320px, 90cqw); font-size: 30px; font-weight: 700; padding: 16px; border: 0; border-radius: 999px;
     background: #ffd23f; color: #2a1650; box-shadow: 0 6px 0 #b8860b; }
   #joinBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8860b; }
   #joinBtn:disabled { opacity: .4; }
@@ -86,7 +91,7 @@
   .zoomBtns button:active { background: var(--me); }
 
   #actionWrap { position: relative; display: flex; justify-content: center; align-items: center; padding: 8px 0; }
-  #action { position: relative; width: min(62vw, 34vh); height: min(62vw, 34vh); border-radius: 50%; border: 6px solid #fff;
+  #action { position: relative; width: min(62vw, 34vh); height: min(62vw, 34vh); width: min(62cqw, 34cqh); height: min(62cqw, 34cqh); border-radius: 50%; border: 6px solid #fff;
     background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--me) 70%, #fff), var(--me) 55%, color-mix(in srgb, var(--me) 70%, #000));
     box-shadow: 0 10px 0 color-mix(in srgb, var(--me) 55%, #000), 0 0 40px color-mix(in srgb, var(--me) 50%, transparent);
     touch-action: none; transition: transform .08s, filter .2s, opacity .2s; }
@@ -95,7 +100,7 @@
   #action:disabled { filter: grayscale(1) brightness(.6); opacity: .6; }
   #action.thrown { animation: thrown .45s ease-out; }
   @keyframes thrown { 0% { transform: scale(.9); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
-  #actionLabel { font-size: clamp(28px, 10vw, 52px); font-weight: 700; color: #fff; text-shadow: 0 3px 0 #0005; pointer-events: none; }
+  #actionLabel { font-size: clamp(28px, 10vw, 52px); font-size: clamp(28px, 10cqw, 52px); font-weight: 700; color: #fff; text-shadow: 0 3px 0 #0005; pointer-events: none; }
   #ring { position: absolute; inset: -14px; border-radius: 50%; pointer-events: none; --c: 0;
     background: conic-gradient(#fff calc(var(--c) * 360deg), transparent 0);
     -webkit-mask: radial-gradient(circle, transparent 64%, #000 65%); mask: radial-gradient(circle, transparent 64%, #000 65%); opacity: .9; }
@@ -121,17 +126,21 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .phone-art { font-size: 70px; line-height: 1; transform: rotate(-60deg); }
   .bigbtn { border: 0; border-radius: 999px; padding: 16px 30px; font-size: 24px; font-weight: 700; background: #ffd23f; color: #2a1650; box-shadow: 0 6px 0 #b8860b; }
-  #settings .row { display: flex; flex-direction: column; gap: 8px; width: min(320px, 90vw); text-align: left; font-weight: 600; }
+  #settings .row { display: flex; flex-direction: column; gap: 8px; width: min(320px, 90vw); width: min(320px, 90cqw); text-align: left; font-weight: 600; }
+  #settings .check { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+  #settings .check small { display: block; font-weight: 500; color: var(--muted); font-size: 13px; }
+  #settings .check input { width: 26px; height: 26px; flex: none; accent-color: var(--me); }
   #settings select, #settings input[type=range], #settings input:not([type]) { width: 100%; font: inherit; font-size: 18px; }
   #settings input:not([type]) { padding: 8px 12px; border-radius: 10px; background: #0004; color: #fff; border: 2px solid #fff3; font-weight: 600; }
   #settings select { padding: 8px; border-radius: 10px; background: #0004; color: #fff; border: 2px solid #fff3; }
   #toast { position: fixed; left: 50%; top: calc(max(14px, env(safe-area-inset-top)) + 46px); transform: translate(-50%, -20px); background: #000d; padding: 10px 16px;
-    border-radius: 14px; font-weight: 600; font-size: 15px; opacity: 0; transition: all .25s; z-index: 20; width: max-content; max-width: 90vw; text-align: center;
+    border-radius: 14px; font-weight: 600; font-size: 15px; opacity: 0; transition: all .25s; z-index: 20; width: max-content; max-width: 90%; text-align: center;
     pointer-events: none; }
   #toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
+  <div id="app">
   <section id="join" class="screen">
     <div class="logo">TOPPLE<br /><span>PARTY</span></div>
     <label>Room code<input id="code" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="4" placeholder="ABCD" /></label>
@@ -178,6 +187,7 @@
       <select id="aimMode"><option value="motion">Motion (point your phone)</option><option value="touch">Touch pad (drag to aim)</option></select>
     </div>
     <div class="row">Sensitivity<input id="sens" type="range" min="0.5" max="2" step="0.1" /></div>
+    <label class="row check"><span>Keep the screen upright<small>Full screen + portrait lock while playing</small></span><input id="lockRot" type="checkbox" /></label>
     <div class="row">Your name<input id="renameIn" maxlength="14" autocomplete="nickname" /></div>
     <button id="leaveBtn" class="hbtn">Leave game</button>
     <button id="settingsClose" class="bigbtn">Done</button>
@@ -189,6 +199,7 @@
     <p id="overlaySub"></p>
   </section>
   <div id="toast"></div>
+  </div>
 
   <script type="module" src="/src/controller/main.ts"></script>
 </body>

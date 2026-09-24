@@ -1,6 +1,7 @@
 import { MODES, PROTOCOL_VERSION, cleanName, type C2S, type PadView, type S2C } from '../shared/protocol';
 import { connectToRoom, netConfigFromUrl, type Link } from '../shared/net';
 import { MotionInput } from './motion';
+import { lockUpright, setUprightEnabled, toLocal } from './orientation';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const DEG = Math.PI / 180;
@@ -99,6 +100,7 @@ joinBtn.addEventListener('click', () => {
   save('lastCode', code);
   // Permission prompt must run inside the click handler (iOS).
   const perm = aimMode === 'motion' ? motion.requestPermission() : Promise.resolve(false);
+  lockUpright();
   requestWakeLock();
   joinBtn.disabled = true;
   joinErr.textContent = '';
@@ -347,12 +349,11 @@ pad.addEventListener('pointerdown', (e) => {
 });
 pad.addEventListener('pointermove', (e) => {
   if (!padPointer || padPointer.id !== e.pointerId) return;
-  const dx = e.clientX - padPointer.x, dy = e.clientY - padPointer.y;
+  const { x: dx, y: dy } = toLocal(e.clientX - padPointer.x, e.clientY - padPointer.y);
   padPointer.x = e.clientX;
   padPointer.y = e.clientY;
-  const r = pad.getBoundingClientRect();
-  touchAim.x = Math.max(-1.1, Math.min(1.1, touchAim.x + (dx / r.width) * 2.2 * sensitivity));
-  touchAim.y = Math.max(-1.1, Math.min(1.1, touchAim.y - (dy / r.height) * 2.2 * sensitivity));
+  touchAim.x = Math.max(-1.1, Math.min(1.1, touchAim.x + (dx / pad.clientWidth) * 2.2 * sensitivity));
+  touchAim.y = Math.max(-1.1, Math.min(1.1, touchAim.y - (dy / pad.clientHeight) * 2.2 * sensitivity));
 });
 const endPad = () => (padPointer = null);
 pad.addEventListener('pointerup', endPad);
@@ -381,7 +382,7 @@ camPad.addEventListener('pointermove', (e) => {
     camAcc.dz -= (pinchDist() - before) / 300; // spread fingers = zoom in
     return;
   }
-  const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+  const { x: dx, y: dy } = toLocal(e.clientX - prev.x, e.clientY - prev.y);
   camTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   camAcc.dx -= (dx / camPad.clientWidth) * Math.PI; // the tower turns with your finger
   camAcc.dy -= (dy / camPad.clientHeight) * 4; // drag up to look higher
@@ -481,9 +482,11 @@ setInterval(() => {
     camAcc.dx = camAcc.dy = camAcc.dz = 0;
   }
   if (grab) {
-    const h = window.innerHeight, w = window.innerWidth;
-    let d = (grab.ty - grab.ty0) / (0.22 * h);
-    let s = (grab.tx - grab.tx0) / (0.3 * w);
+    const app = $('app');
+    const h = app.clientHeight, w = app.clientWidth;
+    const thumb = toLocal(grab.tx - grab.tx0, grab.ty - grab.ty0);
+    let d = thumb.y / (0.22 * h);
+    let s = thumb.x / (0.3 * w);
     if (aimMode === 'motion') {
       d += (motion.relPitch - grab.pitch0) / (18 * DEG);
       s += -(motion.relYaw - grab.yaw0) / (18 * DEG);
@@ -520,6 +523,14 @@ sensIn.addEventListener('input', () => {
   sensitivity = Number(sensIn.value);
   motion.setSensitivity(sensitivity);
   save('sens', String(sensitivity));
+});
+const lockIn = $<HTMLInputElement>('lockRot');
+lockIn.checked = load('upright', '1') === '1';
+setUprightEnabled(lockIn.checked);
+lockIn.addEventListener('change', () => {
+  save('upright', lockIn.checked ? '1' : '0');
+  setUprightEnabled(lockIn.checked);
+  if (lockIn.checked) lockUpright();
 });
 const aimSel = $<HTMLSelectElement>('aimMode');
 aimSel.value = aimMode;

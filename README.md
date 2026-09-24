@@ -34,6 +34,9 @@ Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explod
   Use the **camera pad** above the button to get a better angle first. On the TV remote, the
   arrow keys move the camera too.
 * No motion sensors? ⚙ → **Aiming: Touch pad**, then drag to aim and hold-and-release to throw.
+* The controller stays upright while you swing the phone. On Android, tapping JOIN switches to
+  full screen with portrait locked. On iPhone (or after leaving full screen), the page turns itself
+  back if the phone auto-rotates. You can turn this off in ⚙ (**Keep the screen upright**).
 * The first player to join is the **host** (♛) and picks the mode on their phone. The TV remote works too.
 
 ## Setting it up
