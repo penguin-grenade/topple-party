@@ -43,16 +43,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # setup-android v3 installs the SDK `tools` package by default. Google stopped serving
+      # it in September 2026, so the action itself fails. v4 dropped it; we list the packages
+      # we actually need. The action also accepts the SDK licenses for us.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --install \
-             "platform-tools" \
-             "platforms;android-35" \
-             "build-tools;35.0.0"
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
 
       - name: Build the Android TV app (points at the Pages URL)
         env:
@@ -74,6 +71,12 @@ jobs:
         with:
           name: TopplePartyTV-apk
           path: dist/TopplePartyTV.apk
+
+      # Turns on GitHub Pages with the "GitHub Actions" source if it isn't already;
+      # deploy-pages fails with a 404 otherwise.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
