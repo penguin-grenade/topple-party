@@ -17,7 +17,7 @@ of a wobbly tower without toppling it.
 | --- | --- | --- |
 | **Blast Party** | Everyone at once | Timed levels. Knock blocks off their stands; whoever's ball knocked it gets the points. Gold = 10, Gem = 25, Skull = −10. |
 | **Best Shot** | Take turns | Everyone gets 3 balls on an identical copy of the level. Biggest topple wins the round. |
-| **Tower Pull** | Take turns | Jenga-style, on sixteen towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. If only your piece comes out, it scores: deeper pieces score more, long pieces +3, **gold** pieces +15. If other pieces fall too, that's a **spill**: no points, −5 for each piece that fell (−15 at most), the fallen pieces are cleared away and play goes on. Pieces that just slide or get nudged don't count. The tower only ends when a **crown** falls (−15 for whoever dropped it). On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
+| **Tower Pull** | Take turns | Jenga-style, on twenty-one towers that get harder as you climb (see below). Aim at a piece, hold **GRAB**, and slide your thumb (or tilt the phone) the way it should go to pull it out. Every piece slides; the physics is the challenge. There's no time limit, but you can't pass: your turn only ends when a piece comes all the way out. If only your piece comes out, it scores: deeper pieces score more, long pieces +3, **gold** pieces +15. If other pieces fall too, that's a **spill**: no points, −5 for each piece that fell (−15 at most), the fallen pieces are cleared away and play goes on. Pieces that just slide or get nudged don't count. The tower only ends when a **crown** falls (−15 for whoever dropped it). On your turn, the **camera pad** on your phone turns the tower (drag ↔), looks higher/lower (drag ↕) and zooms (pinch or ＋/−). |
 
 Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explode when two touch),
 **ghost** blocks (vanish when hit), **ice** (slippery), **stone** (heavy).
@@ -26,6 +26,7 @@ Special blocks: **bombs** (explode on a hard knock), **chemical** blocks (explod
 
 In the lobby, Tower Pull shows a **Start at tower** picker (TV remote ◀ ▶, or the host's phone).
 Towers 11–16 are the blueprint set: much more complicated structures, for groups who've mastered the first ten.
+Towers 17–21 are the megastructures: whole buildings of 240–630 pieces.
 A game plays one tower per round, climbing from the one you pick: "3 towers" from tower 4 plays
 towers 4, 5 and 6.
 
@@ -47,6 +48,11 @@ towers 4, 5 and 6.
 | 14 | **Corbel Arch** | Two pillars step inward layer by layer until they meet overhead; long balconies keep them from tipping in. Five crowns, two of them out on the balconies. |
 | 15 | **The Trident** | A hollow frame where every piece is load-bearing, a wide deck, and three spires tied by bridges. Three crowns. |
 | 16 | **J-78-D** | 200 pieces: two corbelled arches, a diagonal truss buttress, cantilevered balconies, and three spires, the middle one on a single-piece pivot. Four crowns. |
+| 17 | **The Aqueduct** | 510 pieces: two tiers of corbelled arches on six skinny pillars, a deck of 26 short pieces, six turrets. Three crowns. |
+| 18 | **The Citadel** | 320 pieces: four corner towers tied by two rings of 14-long walls, around a keep with a gallery. Nine crowns, four of them perched on the walls. |
+| 19 | **Babel** | 240 pieces, 25 high: a tapering tower with a landing cantilevered off every layer, spiralling up its corners, and two hollow bands. Four crowns. |
+| 20 | **The Cathedral** | 430 pieces: a nave with three flying buttresses down each side tied in by a course of 10-long pieces, twin towers at the west end, and a spire on a pivot. Three crowns. |
+| 21 | **Metropolis** | 630 pieces: eight towers of every height on one slab, tied together by eight sky-bridges, with crowned balconies hanging off the tallest. Eight crowns, two of them mid-bridge. |
 
 Each tower was tuned headlessly: it has to stand on its own, every piece has to slide out, no piece
 may rest on a single piece running the same way (pulling that one would drop it), and bot playtests
@@ -177,7 +183,7 @@ p/index.html          phone controller page
 src/shared/           protocol, networking (PeerJS / BroadcastChannel), QR encoder
 src/controller/       phone: motion.ts (pointer + flick detection), main.ts (UI)
 src/tv/sim/           physics (Rapier): blocks, levels, explosions, scoring, Tower Pull grab
-src/tv/sim/towers.ts  the sixteen Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
+src/tv/sim/towers.ts  the twenty-one Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
 src/tv/render/        three.js scene, procedural textures, particles
 src/tv/game.ts        players, lobby, networking glue, TV remote input
 src/tv/modes.ts       Practice, Blast Party, Best Shot, Tower Pull
@@ -216,4 +222,6 @@ to check it.
   it, reload the page. **Firefox on Android** has limited sensor support, so use Chrome.
 * **Pointer drifts:** aim at the middle of the TV and tap **◎ Re-center**. Adjust sensitivity in ⚙.
 * **Choppy on the TV:** the game lowers its render resolution automatically. Press **F2** with a
-  keyboard to see FPS.
+  keyboard to see FPS. Blocks are drawn instanced (one draw call per kind of block), so even the
+  630-piece Metropolis is only a few dozen draw calls; if a TV still struggles, the big towers
+  (17–21) are the ones to skip.

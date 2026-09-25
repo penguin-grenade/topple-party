@@ -257,6 +257,7 @@ export class Game {
   loadLevel(spec: LevelSpec, opts: Partial<SimOptions> = {}) {
     this.sim.load(spec, opts);
     this.renderer.setPlinths(spec.plinths);
+    this.renderer.fitShadows(spec);
     this.renderer.setCamera(spec.cam);
     this.renderer.setOutline(null);
     this.renderer.orbit = 0;

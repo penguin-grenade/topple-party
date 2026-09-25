@@ -1,12 +1,13 @@
 // Headless Tower Pull tower lab.
 //
-//   tsx tests/towers-check.ts [all | tower ids or numbers...] [--survey] [--games N] [--careful N] [--seed S]
+//   tsx tests/towers-check.ts [all | tower ids or numbers...] [--survey] [--sample N] [--games N] [--careful N] [--seed S]
 //   (env: HZ=contact stiffness, SUB=physics substeps, WHY=1 to explain every trap)
 //
 // For each tower:
 //   * idle:    settle it like the game does, then keep every piece awake for 20 s. It must not creep
 //              or fall over by itself.
-//   * survey:  on a fresh tower, pull each piece in turn. Every piece must slide out (nothing stuck);
+//   * survey:  on a fresh tower, pull each piece in turn (or a random --sample of N pieces on a big
+//              tower). Every piece must slide out (nothing stuck);
 //              reports which first pulls knock other pieces down ("spills") or drop a crown ("traps").
 //   * games:   play whole towers by the game's rules (spills cost points but play goes on; a fallen
 //              crown ends the tower) with bots that pull a random piece each turn (--games), and
@@ -28,7 +29,7 @@ const num = (n: string, d: number) => {
   const i = args.indexOf(n);
   return i >= 0 ? Number(args[i + 1]) : d;
 };
-const VALUED = ['--games', '--careful', '--seed'];
+const VALUED = ['--games', '--careful', '--seed', '--sample'];
 const ids = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && VALUED.includes(args[i - 1])));
 const ALL = [...TOWERS, ...VARIANTS];
 const pickTowers = ids.length === 0 || ids.includes('all') ? TOWERS : ALL.filter((t) => ids.includes(t.id) || ids.includes(String(ALL.indexOf(t) + 1)));
@@ -139,8 +140,8 @@ function pull(sim: Sim, e: Entity, opts: { sign?: number; speed?: number; wiggle
       return { out: false, stuck: false, crown: true, fell: rubble.size, secs: t };
     }
     watch();
-    // no progress: try the other way once (blocked by something at that end)
-    if (t - lastProgressT > 4 && best < 0.4 && !tried) {
+    // no progress for a while (blocked by something at that end): try the other way once, as a player would
+    if (t - lastProgressT > 2.5 && best < thr * 0.5 && !tried) {
       tried = 1;
       sign = -sign;
       lastProgressT = t;
@@ -245,16 +246,22 @@ function idle(def: TowerDef, spec: LevelSpec) {
   return { settleDrift, drift, fell: fell ? `${fell.type}@${fellAt.toFixed(1)}s` : '', ms, moving: movement(sim), n: pieces(sim).length, crowns: crowns.length, topY };
 }
 
-function survey(def: TowerDef, spec: LevelSpec) {
+function survey(def: TowerDef, spec: LevelSpec, sample = 0) {
   const sim = new Sim();
   load(sim, def, spec);
   const n = pieces(sim).length;
+  const chosen = new Set<number>();
+  if (sample && sample < n) while (chosen.size < sample) chosen.add(Math.floor(rnd() * n));
   const traps: number[] = [];
   const spills: number[] = [];
   const stuck: number[] = [];
   const secs: number[] = [];
   const map: string[] = [];
   for (let i = 0; i < n; i++) {
+    if (chosen.size && !chosen.has(i)) {
+      map.push(' ');
+      continue;
+    }
     load(sim, def, spec);
     sim.settle(SETTLE);
     const ps = pieces(sim);
@@ -268,7 +275,7 @@ function survey(def: TowerDef, spec: LevelSpec) {
     map.push(r.stuck ? 'S' : r.crown ? 'X' : r.fell ? 's' : '.');
     if ((r.crown || r.fell) && process.env.WHY) console.log(`    #${i} (${e.type} len ${pieceLength(e).toFixed(1)} at y ${e.home.y.toFixed(2)}): ${r.crown ? 'crown fell' : `${r.fell} fell`}`);
   }
-  return { n, traps, spills, stuck, map: map.join(''), pullSecs: secs.reduce((a, b) => a + b, 0) / Math.max(1, secs.length) };
+  return { n: chosen.size || n, traps, spills, stuck, map: map.join(''), pullSecs: secs.reduce((a, b) => a + b, 0) / Math.max(1, secs.length) };
 }
 
 /**
@@ -343,7 +350,7 @@ async function main() {
     );
     if (!ok) continue;
     if (doSurvey) {
-      const sv = survey(def, spec);
+      const sv = survey(def, spec, num('--sample', 0));
       if (sv.stuck.length) fail++;
       console.log(
         `  survey: ${sv.n - sv.traps.length - sv.spills.length - sv.stuck.length} clean, ${sv.spills.length} spills, ${sv.traps.length} drop a crown (${((100 * sv.traps.length) / sv.n).toFixed(0)}%), ${sv.stuck.length} stuck, avg pull ${sv.pullSecs.toFixed(1)}s`,

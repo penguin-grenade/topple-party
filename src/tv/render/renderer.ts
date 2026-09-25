@@ -8,6 +8,22 @@ import { blockMaterial } from './textures';
 import { Fx } from './fx';
 
 const tmpV = new THREE.Vector3();
+const tmpP = new THREE.Vector3();
+const tmpQ = new THREE.Quaternion();
+const tmpS = new THREE.Vector3();
+const tmpM = new THREE.Matrix4();
+
+interface InstGroup {
+  key: string;
+  mesh: THREE.InstancedMesh;
+  /** slots handed out so far (free ones are reused first) */
+  used: number;
+  free: number[];
+  /** blocks currently shown through this group; an empty group is hidden so it costs nothing */
+  live: number;
+  /** slots whose body was asleep when last written: no need to rewrite them every frame */
+  settled?: Set<number>;
+}
 
 export class Renderer {
   readonly gl: THREE.WebGLRenderer;
@@ -15,7 +31,11 @@ export class Renderer {
   readonly camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.3, 500);
   readonly fx = new Fx();
   private sun: THREE.DirectionalLight;
+  /** balls: one mesh each */
   private meshes = new Map<Entity, THREE.Mesh>();
+  /** blocks: one InstancedMesh per (size, type), so a 600-piece tower is a handful of draw calls */
+  private inst = new Map<string, InstGroup>();
+  private slotOf = new Map<Entity, { g: InstGroup; i: number }>();
   private geos = new Map<string, THREE.BufferGeometry>();
   private ballGeo = new THREE.SphereGeometry(BALL_R, 24, 16);
   private ballMats = new Map<string, THREE.Material>();
@@ -123,6 +143,22 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Back the sun off and widen its shadow box so a big tower is lit and shadowed all the way up. */
+  fitShadows(spec: { blocks: { x: number; y: number; z: number; sx: number; sy: number; sz: number }[] }) {
+    let r = 0, top = 0;
+    for (const k of spec.blocks) {
+      r = Math.max(r, Math.hypot(k.x, k.z) + Math.max(k.sx, k.sz) / 2);
+      top = Math.max(top, k.y + k.sy / 2);
+    }
+    const k = Math.max(1, (0.6 * top + 0.6 * r) / 12);
+    this.sun.position.set(10 * k, 24 * k, 14 * k);
+    const sc = this.sun.shadow.camera;
+    const ext = 17 * k;
+    sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 4 * k; sc.far = 70 * k;
+    sc.updateProjectionMatrix();
+    this.sun.shadow.needsUpdate = true;
+  }
+
   setPlinths(ps: PlinthSpec[]) {
     for (const c of [...this.plinthGroup.children]) {
       this.plinthGroup.remove(c);
@@ -168,7 +204,8 @@ export class Renderer {
     let g = this.geos.get(key);
     if (!g) {
       const r = Math.min(0.07, Math.min(sx, sy, sz) * 0.14);
-      g = new RoundedBoxGeometry(sx, sy, sz, 2, r);
+      // TVs: fewer segments on the rounded edges (a third of the triangles), which hides fine at TV distance
+      g = new RoundedBoxGeometry(sx, sy, sz, this.lowQuality ? 1 : 2, r);
       this.geos.set(key, g);
     }
     return g;
@@ -186,24 +223,33 @@ export class Renderer {
   /** Create/update/remove meshes to mirror the simulation. `colorOf` maps player id -> color. */
   sync(sim: Sim, colorOf: (player: number) => string) {
     for (const e of sim.ents) {
-      if (this.meshes.has(e) || e.gone) continue;
-      let m: THREE.Mesh;
+      if (e.gone || this.meshes.has(e) || this.slotOf.has(e)) continue;
       if (e.kind === 'ball') {
-        m = new THREE.Mesh(this.ballGeo, this.ballMat(colorOf(e.playerId)));
+        const m = new THREE.Mesh(this.ballGeo, this.ballMat(colorOf(e.playerId)));
         m.castShadow = true;
-      } else {
-        m = new THREE.Mesh(this.geoFor(e.size.x, e.size.y, e.size.z), blockMaterial(e.type as BlockType, this.gl.capabilities.getMaxAnisotropy()));
-        m.castShadow = true;
-        m.receiveShadow = true;
+        this.scene.add(m);
+        this.meshes.set(e, m);
+        continue;
       }
-      this.scene.add(m);
-      this.meshes.set(e, m);
+      const key = `${e.size.x.toFixed(3)}|${e.size.y.toFixed(3)}|${e.size.z.toFixed(3)}|${e.type}`;
+      let g = this.inst.get(key);
+      if (!g) {
+        g = { key, mesh: null as unknown as THREE.InstancedMesh, used: 0, free: [], live: 0 };
+        this.inst.set(key, g);
+      }
+      let i = g.free.pop() ?? -1;
+      if (i < 0) {
+        if (!g.mesh || g.used >= g.mesh.count) this.growGroup(g, e);
+        i = g.used++;
+      }
+      this.slotOf.set(e, { g, i });
+      g.live++;
+      g.mesh.visible = true;
     }
     for (const [e, m] of this.meshes) {
       if (e.gone) {
         this.scene.remove(m);
         this.meshes.delete(e);
-        if (this.outlineOf === e) this.setOutline(null);
         continue;
       }
       const t = e.body.translation();
@@ -213,19 +259,67 @@ export class Renderer {
       const left = e.dieAt - sim.time;
       m.scale.setScalar(left < 0.5 ? Math.max(0.01, left / 0.5) : 1);
     }
+    for (const [e, { g, i }] of this.slotOf) {
+      if (e.gone) {
+        // park the instance out of sight and hand its slot back
+        tmpM.makeScale(0, 0, 0);
+        g.mesh.setMatrixAt(i, tmpM);
+        g.mesh.instanceMatrix.needsUpdate = true;
+        g.free.push(i);
+        this.slotOf.delete(e);
+        if (--g.live === 0) g.mesh.visible = false;
+        if (this.outlineOf === e) this.setOutline(null);
+        continue;
+      }
+      if (e.body.isSleeping() && e.dieAt === Infinity && g.settled?.has(i)) continue;
+      const t = e.body.translation();
+      const r = e.body.rotation();
+      const left = e.dieAt - sim.time;
+      const sc = left < 0.5 ? Math.max(0.01, left / 0.5) : 1;
+      tmpP.set(t.x, t.y, t.z);
+      tmpQ.set(r.x, r.y, r.z, r.w);
+      tmpS.setScalar(sc);
+      tmpM.compose(tmpP, tmpQ, tmpS);
+      g.mesh.setMatrixAt(i, tmpM);
+      g.mesh.instanceMatrix.needsUpdate = true;
+      if (e.body.isSleeping()) (g.settled ??= new Set()).add(i);
+      else g.settled?.delete(i);
+    }
     if (this.outlineOf && !this.outlineOf.gone) {
-      const m = this.meshes.get(this.outlineOf);
-      if (m) {
-        this.outline.position.copy(m.position);
-        this.outline.quaternion.copy(m.quaternion);
-        if (this.arrowRig.visible) {
-          this.arrowRig.position.copy(m.position);
-          this.arrowRig.quaternion.copy(m.quaternion);
-          const pulse = 1 + Math.sin(performance.now() / 160) * 0.12;
-          for (const a of this.arrowRig.children) a.scale.setScalar(pulse);
-        }
+      const t = this.outlineOf.body.translation();
+      const r = this.outlineOf.body.rotation();
+      this.outline.position.set(t.x, t.y, t.z);
+      this.outline.quaternion.set(r.x, r.y, r.z, r.w);
+      if (this.arrowRig.visible) {
+        this.arrowRig.position.copy(this.outline.position);
+        this.arrowRig.quaternion.copy(this.outline.quaternion);
+        const pulse = 1 + Math.sin(performance.now() / 160) * 0.12;
+        for (const a of this.arrowRig.children) a.scale.setScalar(pulse);
       }
     }
+  }
+
+  /** Make room for more instances of a kind of block (doubling), keeping the ones already placed. */
+  private growGroup(g: InstGroup, sample: Entity) {
+    const cap = g.mesh ? g.mesh.count * 2 : 32;
+    const mesh = new THREE.InstancedMesh(this.geoFor(sample.size.x, sample.size.y, sample.size.z), blockMaterial(sample.type as BlockType, this.gl.capabilities.getMaxAnisotropy()), cap);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false; // its instances are all over the tower; the box at its origin says nothing
+    tmpM.makeScale(0, 0, 0);
+    for (let i = 0; i < cap; i++) mesh.setMatrixAt(i, tmpM);
+    if (g.mesh) {
+      for (let i = 0; i < g.mesh.count; i++) {
+        g.mesh.getMatrixAt(i, tmpM);
+        mesh.setMatrixAt(i, tmpM);
+      }
+      this.scene.remove(g.mesh);
+      g.mesh.dispose();
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(mesh);
+    g.mesh = mesh;
+    g.settled = undefined;
   }
 
   /** Highlight a block. With `arrows`, also show which two ways it can slide (Tower Pull grab). */
