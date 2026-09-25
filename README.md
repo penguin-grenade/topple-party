@@ -186,6 +186,8 @@ src/tv/sim/           physics (Rapier): blocks, levels, explosions, scoring, Tow
 src/tv/sim/towers.ts  the twenty-one Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
 src/tv/sim/towerFile.ts  tower file format: validation, structural checks, to/from JSON (no three.js/physics)
 src/tv/towerLoader.ts bundled tower files, ?tower= URLs, phone imports
+edit/index.html       Tower Editor page; src/editor/ has the plan view, 3D preview and document model
+src/tv/sim/pullSim.ts simulated pulls and settle runs, shared by the tower lab and the editor
 public/towers/        tower files the game loads (index.json lists them); examples/ = the built-ins as files
 scripts/towers.ts     export the built-ins, rebuild the index, check a file
 docs/tower-format.md  the tower file format
@@ -206,11 +208,21 @@ lays `n` pieces of length `len` side by side, running along `ang` (any angle), a
 The camera frames each tower automatically. Run `tsx tests/towers-check.ts <id> --survey --games 12`
 to check it.
 
-### Tower files (for a tower designer)
+### Tower Editor and tower files
 
-Towers can also be plain JSON **tower files**: a flat list of pieces and crowns any tool can
-write. [docs/tower-format.md](docs/tower-format.md) has the format; `public/towers/examples/`
-has every built-in tower exported as one. The game loads files listed in `public/towers/index.json`
+**<https://penguin-grenade.github.io/topple-party/edit/>** is the Tower Editor: a top-down,
+layer-by-layer designer with a 3D preview. Place pieces, rows, crowns and plinths (snapping to the
+game's grid), duplicate a layer turned 90° with one key, and watch the checks panel flag overlaps,
+floating blocks and single-parallel supports as you go. **Settle test** builds the tower in the
+real physics engine and shows whether it stands; **Pull selected** pulls a piece the way a player
+would and reports a clean pull, a spill or a dropped crown. **Save .json** downloads the tower
+file, **Copy JSON** puts it on the clipboard for the phone's import, and **Play in game** opens the
+game with the tower already in its list. The editor autosaves to the browser. Locally it's
+`http://localhost:5173/edit/`.
+
+Towers are plain JSON **tower files**: a flat list of pieces and crowns any tool can write.
+[docs/tower-format.md](docs/tower-format.md) has the format; `public/towers/examples/` has every
+built-in tower exported as one (the editor's *Load example…* menu opens them). The game loads files listed in `public/towers/index.json`
 at start-up, any `?tower=<url>` on the TV page, and files the host pastes or picks on their phone
 (**Import tower file…** in the lobby). `npm run towers:check my.json` runs the structural checks
 (overlaps, floating blocks, single-parallel supports) and `tsx tests/towers-check.ts my.json --survey`

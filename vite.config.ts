@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
       input: {
         tv: here('./index.html'),
         pad: here('./p/index.html'),
+        edit: here('./edit/index.html'),
       },
     },
   },

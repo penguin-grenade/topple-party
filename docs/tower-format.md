@@ -1,5 +1,8 @@
 # Tower files
 
+The easiest way to make one is the **Tower Editor** at `/edit/` (see the README); this page is the
+format it reads and writes, for anyone building another tool.
+
 A **tower file** is a JSON description of one Tower Pull tower: a flat list of pieces, so any
 tool can write one and the game can play it. This is the contract between a tower designer and
 the game. Every built-in tower is exported in this format in [`public/towers/examples/`](../public/towers/examples/)

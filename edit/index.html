@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Topple Party · Tower Editor</title>
+<link rel="icon" href="../icon.svg" />
+<style>
+  :root { --bg: #14102a; --panel: #1f1a38; --panel2: #2a2447; --text: #f3efff; --muted: #a49dc4; --accent: #7fd6ff; --gold: #ffd23f; --bad: #ff5a6e; --good: #33c46a; --warn: #ff9f43; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: grid; grid-template-rows: 48px 1fr; grid-template-columns: 250px 1fr 380px; grid-template-areas: "top top top" "left plan right"; height: 100vh; overflow: hidden; }
+  header { grid-area: top; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid #ffffff14; }
+  header .logo { font-weight: 800; letter-spacing: .02em; margin-right: 8px; }
+  header .logo span { color: var(--gold); }
+  header .grow { flex: 1; }
+  header button { white-space: nowrap; }
+  header select { width: 190px; }
+  button, select, input[type=text], input[type=number] { font: inherit; color: inherit; }
+  button { background: var(--panel2); border: 1px solid #ffffff1c; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  button:hover { background: #3a3360; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--good); border-color: transparent; color: #0b2a17; font-weight: 700; }
+  button.on { background: var(--accent); color: #0b2540; border-color: transparent; font-weight: 700; }
+  input[type=text], input[type=number], select { background: #0006; border: 1px solid #ffffff1c; border-radius: 8px; padding: 5px 8px; width: 100%; }
+  input[type=number] { width: 72px; }
+  aside { background: var(--panel); overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 12px; }
+  aside.left { grid-area: left; border-right: 1px solid #ffffff14; }
+  aside.right { grid-area: right; border-left: 1px solid #ffffff14; padding: 0; gap: 0; display: grid; grid-template-rows: 46% 1fr; }
+  section h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tools button { text-align: left; }
+  .tools button kbd { float: right; opacity: .5; font: inherit; }
+  .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .row label { color: var(--muted); min-width: 56px; }
+  .row .presets { display: flex; gap: 3px; flex-wrap: wrap; }
+  .row .presets button { padding: 3px 7px; font-size: 12px; }
+  .chk { display: flex; align-items: center; gap: 6px; }
+  main { grid-area: plan; position: relative; min-width: 0; min-height: 0; }
+  #plan { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+  #planTop { position: absolute; left: 10px; top: 10px; display: flex; gap: 6px; align-items: center; background: #14102acc; padding: 6px 8px; border-radius: 10px; }
+  #planTop b { font-size: 16px; color: var(--gold); min-width: 70px; text-align: center; }
+  #status { position: absolute; right: 10px; bottom: 8px; color: var(--muted); font-size: 12px; background: #14102acc; padding: 3px 8px; border-radius: 8px; }
+  #view { width: 100%; height: 100%; display: block; touch-action: none; }
+  .viewWrap { position: relative; min-height: 0; }
+  #viewTools { position: absolute; left: 8px; top: 8px; display: flex; gap: 6px; }
+  #physMsg { position: absolute; left: 8px; bottom: 8px; right: 8px; background: #14102acc; padding: 6px 10px; border-radius: 8px; font-size: 13px; display: none; }
+  #physMsg.show { display: block; }
+  .checks { overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #ffffff14; min-height: 0; }
+  #stats { color: var(--muted); font-size: 13px; }
+  #checkList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  #checkList li { padding: 6px 8px; border-radius: 8px; background: #ffffff0a; cursor: pointer; font-size: 13px; border-left: 3px solid var(--muted); }
+  #checkList li.err { border-left-color: var(--bad); }
+  #checkList li.warn { border-left-color: var(--warn); }
+  #checkList li.ok { border-left-color: var(--good); cursor: default; }
+  #checkList li:hover { background: #ffffff14; }
+  .small { font-size: 12px; color: var(--muted); }
+  .sel { background: #ffffff0a; border-radius: 8px; padding: 8px; }
+  .sel .row label { min-width: 48px; }
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: #ffd23f; color: #2a1650; padding: 8px 16px; border-radius: 999px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #openFile { display: none; }
+  .help { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .help kbd { background: #ffffff14; border-radius: 4px; padding: 0 4px; font-family: inherit; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">TOPPLE <span>PARTY</span> · Tower Editor</div>
+    <button id="newBtn" title="Start a new tower">New</button>
+    <button id="openBtn" title="Open a tower file (.json)">Open…</button>
+    <select id="examples" title="Load one of the built-in towers"><option value="">Load example…</option></select>
+    <button id="saveBtn" class="primary" title="Download the tower file">Save .json</button>
+    <button id="copyBtn" title="Copy the tower file to the clipboard (paste it on the host's phone)">Copy JSON</button>
+    <button id="playBtn" title="Open the game with this tower added to its list">Play in game</button>
+    <div class="grow"></div>
+    <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
+    <button id="redoBtn" title="Redo (Ctrl+Y)">↷ Redo</button>
+  </header>
+
+  <aside class="left">
+    <section>
+      <h3>Tower</h3>
+      <div class="row"><label>Name</label><input id="tName" type="text" maxlength="40" /></div>
+      <div class="row"><label>Id</label><input id="tId" type="text" maxlength="40" pattern="[A-Za-z0-9-]+" /></div>
+      <div class="row"><label>Blurb</label><input id="tBlurb" type="text" maxlength="140" /></div>
+      <div class="row"><label>Camera</label><input id="tYaw" type="number" step="1" placeholder="35.6" /><span class="small">° yaw</span></div>
+    </section>
+    <section>
+      <h3>Tool</h3>
+      <div class="tools">
+        <button data-tool="select">Select <kbd>1</kbd></button>
+        <button data-tool="piece">Piece <kbd>2</kbd></button>
+        <button data-tool="row">Row <kbd>3</kbd></button>
+        <button data-tool="crown">Crown <kbd>4</kbd></button>
+        <button data-tool="plinth">Plinth <kbd>5</kbd></button>
+      </div>
+    </section>
+    <section>
+      <h3>Piece</h3>
+      <div class="row"><label>Length</label><input id="pLen" type="number" step="0.01" min="0.5" max="40" /></div>
+      <div class="row"><label></label><div class="presets" id="lenPresets"></div></div>
+      <div class="row"><label>Angle</label><input id="pAng" type="number" step="15" /><div class="presets"><button data-ang="0">0°</button><button data-ang="90">90°</button><button data-ang="45">45°</button></div></div>
+      <div class="row"><label></label><label class="chk"><input id="pGold" type="checkbox" /> gold (+15)</label></div>
+    </section>
+    <section>
+      <h3>Crown &amp; plinth</h3>
+      <div class="row"><label>Crown</label><input id="cSize" type="number" step="0.1" min="0.4" max="2" /><span class="small">size</span></div>
+      <div class="row"><label>Plinth</label><input id="plH" type="number" step="0.1" min="0.1" max="10" /><span class="small">height</span></div>
+    </section>
+    <section>
+      <h3>Snap</h3>
+      <div class="row"><label>Grid</label><select id="snap"><option value="0.51">½ pitch (0.51)</option><option value="1.02">pitch (1.02)</option><option value="0.1">0.1</option><option value="0">off</option></select></div>
+    </section>
+    <section>
+      <h3>Layer</h3>
+      <div class="row"><button id="dupUp" title="Copy this layer up one, turned 90° (Ctrl+D)">Duplicate up, turned</button></div>
+      <div class="row"><button id="dupSame" title="Copy this layer up one, same direction">Duplicate up, same</button><button id="clearLayer" title="Delete everything on this layer">Clear</button></div>
+    </section>
+    <section class="help">
+      <b>Keys</b>: <kbd>[</kbd> <kbd>]</kbd> layer down/up · <kbd>R</kbd> turn 90° · <kbd>G</kbd> gold · <kbd>Del</kbd> delete · <kbd>D</kbd> duplicate selection · arrows nudge · <kbd>Ctrl+A</kbd> select layer · <kbd>Esc</kbd> deselect · wheel zoom · right-drag pan · <kbd>F</kbd> fit
+    </section>
+  </aside>
+
+  <main>
+    <canvas id="plan"></canvas>
+    <div id="planTop">
+      <button id="layerDown" title="Layer down ( [ )">▼</button>
+      <b id="layerY">y 1.000</b>
+      <button id="layerUp" title="Layer up ( ] )">▲</button>
+      <button id="layerTop" title="Jump to the top of the tower">Top</button>
+      <span id="layerInfo" class="small"></span>
+      <button id="fitBtn" title="Fit the tower in view (F)">Fit</button>
+    </div>
+    <div id="status"></div>
+  </main>
+
+  <aside class="right">
+    <div class="viewWrap">
+      <canvas id="view"></canvas>
+      <div id="viewTools">
+        <button id="settleBtn" title="Build the tower in the physics engine and watch it settle (nothing should fall)">▶ Settle test</button>
+        <button id="pullBtn" title="Pull the selected piece the way a player would" disabled>▶ Pull selected</button>
+        <button id="stopBtn" style="display:none">■ Stop</button>
+      </div>
+      <div id="physMsg"></div>
+    </div>
+    <div class="checks">
+      <div id="stats"></div>
+      <div id="selInfo" class="sel" style="display:none"></div>
+      <h3 style="margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Checks</h3>
+      <ul id="checkList"></ul>
+    </div>
+  </aside>
+  <div id="toast"></div>
+  <input id="openFile" type="file" accept=".json,application/json" />
+  <script type="module" src="/src/editor/main.ts"></script>
+</body>
+</html>

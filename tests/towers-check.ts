@@ -18,7 +18,8 @@
 import { Sim, initPhysics, pos, type Entity, type V3 } from '../src/tv/sim/sim';
 import { buildLevel, type LevelSpec } from '../src/tv/sim/levels';
 import { TOWERS, TOWER_CONTACT_HZ, type TowerDef } from '../src/tv/sim/towers';
-import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, snapshotOf, fallenPieces, fallenCrown } from '../src/tv/sim/pull';
+import { isPiece, pieceLength, snapshotOf, fallenPieces, fallenCrown } from '../src/tv/sim/pull';
+import { PullRun, movement, towerCenter, type PullOptions, type PullResult } from '../src/tv/sim/pullSim';
 import type { BlockType } from '../src/tv/sim/blocks';
 import { VARIANTS } from './tower-variants';
 import { parseTowerJson, checkTowerJson, towerFromJson } from '../src/tv/sim/towerFile';
@@ -57,7 +58,6 @@ const rnd = () => {
   return (rngState - 1) / 2147483646;
 };
 
-const FRAME = 1 / 60;
 /** frames a new tower settles for before play (the game does the same) */
 const SETTLE = 90;
 /** pulls after which the tower was still moving 8 s later (the game moves on after 9 s) */
@@ -72,16 +72,6 @@ function snap(sim: Sim) {
   for (const e of sim.blocks()) m.set(e, pos(e));
   return m;
 }
-function movement(sim: Sim, except?: Entity) {
-  let m = 0;
-  for (const e of sim.blocks()) {
-    if (e === except || e.body.isSleeping()) continue;
-    const v = e.body.linvel();
-    m = Math.max(m, Math.hypot(v.x, v.y, v.z));
-  }
-  return m;
-}
-
 // ------------------------------------------------------------------ state cloning (careful bot)
 interface Saved {
   type: BlockType;
@@ -105,101 +95,11 @@ function restore(sim: Sim, def: TowerDef, spec: LevelSpec, st: Saved[]) {
 }
 
 // ------------------------------------------------------------------ one pull, the way a player does it
-interface PullResult {
-  out: boolean;
-  stuck: boolean;
-  /** a crown fell: the tower is over */
-  crown: boolean;
-  /** other pieces knocked down (and cleared away) */
-  fell: number;
-  secs: number;
-}
-/**
- * Grab `e`, slide it out toward the nearer end (or `sign`), wiggling a little, at `speed` m/s of
- * target travel. Then wait for the tower to settle like the game's check phase does.
- */
-function pull(sim: Sim, e: Entity, opts: { sign?: number; speed?: number; wiggle?: number; center?: V3 } = {}): PullResult {
-  const axis = pieceAxis(e);
-  const c = opts.center ?? { x: 0, y: 0, z: 0 };
-  const p0 = pos(e);
-  let sign = opts.sign ?? Math.sign((p0.x - c.x) * axis.x + (p0.z - c.z) * axis.z);
-  if (!sign) sign = rnd() < 0.5 ? -1 : 1;
-  const thr = outThreshold(e);
-  const speed = opts.speed ?? 1.3;
-  const wig = opts.wiggle ?? 0.4;
-  // the same bookkeeping as the game's PullMode
-  const snapshot = snapshotOf(sim.blocks());
-  const rubble = new Set<Entity>();
-  const crownDown = () => !!fallenCrown(snapshot);
-  const watch = () => {
-    for (const f of fallenPieces(snapshot, rubble)) {
-      if (f === e) out = true; // the piece in hand tipped out: that's the pull
-      else rubble.add(f);
-    }
-  };
-  sim.grabStart(e, axis);
-  let t = 0;
-  let out = false;
-  let tried = 0;
-  let lastProgressT = 0;
-  let best = 0;
-  while (t < 14 && !out) {
-    const along = sign * Math.min(thr + 1.2, (t - lastProgressT) * speed);
-    const perp = Math.sin(t * 7) * wig;
-    sim.grabOffset(axis.x * along - axis.z * perp, axis.z * along + axis.x * perp);
-    sim.step();
-    t += FRAME;
-    const od = outDistance(e, axis) * sign;
-    if (od > best + 0.05) best = od;
-    if (Math.abs(outDistance(e, axis)) > thr) out = true;
-    if (crownDown()) {
-      sim.grabEnd();
-      return { out: false, stuck: false, crown: true, fell: rubble.size, secs: t };
-    }
-    watch();
-    // no progress for a while (blocked by something at that end): try the other way once, as a player would
-    if (t - lastProgressT > 2.5 && best < thr * 0.5 && !tried) {
-      tried = 1;
-      sign = -sign;
-      lastProgressT = t;
-      best = 0;
-    }
-  }
-  sim.grabEnd();
-  if (!out) return { out: false, stuck: true, crown: false, fell: rubble.size, secs: t };
-  sim.remove(e);
-  snapshot.delete(e);
-  // check phase: settle (2.4 s at least, 9 s at most), clear what fell, settle again
-  let fell = 0;
-  for (let round = 0; round < 6; round++) {
-    let s = round === 0 ? 0 : 1.2;
-    while (s < 9) {
-      sim.step();
-      s += FRAME;
-      if (crownDown()) return { out: true, stuck: false, crown: true, fell: fell + rubble.size, secs: t };
-      watch();
-      if (s > 2.4 && movement(sim) < 0.2) break;
-    }
-    if (s >= 9) slowSettles++;
-    if (!rubble.size || round === 5) break;
-    for (const r of rubble) {
-      sim.remove(r);
-      snapshot.delete(r);
-      fell++;
-    }
-    rubble.clear();
-  }
-  return { out: true, stuck: false, crown: false, fell, secs: t };
-}
-
-function towerCenter(sim: Sim): V3 {
-  const ps = pieces(sim);
-  let x = 0, z = 0;
-  for (const e of ps) {
-    x += e.home.x;
-    z += e.home.z;
-  }
-  return { x: x / ps.length, y: 0, z: z / ps.length };
+/** One simulated pull, the game's way (see pullSim.ts). */
+function pull(sim: Sim, e: Entity, opts: PullOptions = {}): PullResult {
+  const r = new PullRun(sim, e, opts).run();
+  if (r.slowSettle) slowSettles++;
+  return r;
 }
 
 // ------------------------------------------------------------------ tests
