@@ -2,6 +2,7 @@ import { Game } from './game';
 import { initPhysics } from './sim/sim';
 import { LEVELS, PRACTICE, buildLevel } from './sim/levels';
 import { TOWERS } from './sim/towers';
+import { loadTowerFiles } from './towerLoader';
 
 async function boot() {
   if ((window as any).__compatFail) return; // the inline check already explained what's missing
@@ -11,7 +12,9 @@ async function boot() {
     // let the display font load so block numbers and UI render in it (don't wait long)
     await Promise.race([(document as any).fonts?.ready, new Promise((r) => setTimeout(r, 1500))]);
     await initPhysics();
+    const notes = await loadTowerFiles();
     const game = new Game(canvas);
+    for (const n of notes) game.hud.toast(n);
     (window as any).__game = game;
     Object.assign(window as any, { __levels: [...LEVELS, PRACTICE, ...TOWERS], __towers: TOWERS, __buildLevel: buildLevel });
     game.begin();

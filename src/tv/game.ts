@@ -2,7 +2,8 @@ import { NetHost, netConfigFromUrl, netConfigToQuery, type Link, type NetConfig 
 import { MAX_PLAYERS, MODES, PLAYER_COLORS, PROTOCOL_VERSION, cleanName, type C2S, type ModeId, type PadView, type S2C } from '../shared/protocol';
 import { Sfx } from './audio';
 import { Hud, ICON_SOUND_OFF, ICON_SOUND_ON, LOBBY_FOCUS, type ChipInfo, type LobbyFocus, type TowerPick } from './hud';
-import { TOWERS } from './sim/towers';
+import { TOWERS, isCustomTower } from './sim/towers';
+import { importTowerText, clearImported, importedCount } from './towerLoader';
 import { towerSilhouette } from './towerPreview';
 
 const MAX_ROUNDS = 10;
@@ -309,7 +310,8 @@ export class Game {
     const first = this.towerStart + 1;
     const last = Math.min(TOWERS.length, first + this.rounds - 1);
     const extra = first + this.rounds - 1 - last;
-    let plan = this.rounds === 1 ? 'Just this tower' : `Plays towers ${first}–${last}`;
+    let plan = this.rounds === 1 ? 'Just this tower' : first === last ? `Plays tower ${first}` : `Plays towers ${first}–${last}`;
+    if (isCustomTower(this.towerStart)) plan += ' · from a tower file';
     if (extra > 0) plan += `, then ${TOWERS[TOWERS.length - 1].name} ${extra === 1 ? 'again' : `${extra} more times`}`;
     return { n: first, count: TOWERS.length, name: TOWERS[this.towerStart].name, plan, svg: towerSilhouette(this.towerStart) };
   }
@@ -560,6 +562,28 @@ export class Game {
           this.sfx.blip(true);
         }
         break;
+      case 'tower-json': {
+        if (this.phase !== 'lobby') break;
+        const r = importTowerText(String(m.json ?? ''), { save: true, from: this.host()?.name });
+        if (r.ok) {
+          this.selMode = 'pull';
+          this.towerStart = r.index!;
+          this.lobbyFocus = 'tower';
+          this.sfx.blip(true);
+        }
+        this.hud.toast(r.message);
+        const h = this.host();
+        if (h) this.send(h, { t: 'note', text: r.message });
+        break;
+      }
+      case 'tower-clear': {
+        if (this.phase !== 'lobby') break;
+        const n = clearImported();
+        this.towerStart = clamp(this.towerStart, 0, TOWERS.length - 1);
+        this.hud.toast(n ? `Removed ${n} imported tower${n === 1 ? '' : 's'}` : 'No imported towers to remove');
+        this.sfx.blip(false);
+        break;
+      }
       case 'start':
         if (this.phase === 'lobby') this.startGame();
         break;
@@ -807,6 +831,7 @@ export class Game {
         tower: this.towerStart + 1,
         towerName: TOWERS[this.towerStart].name,
         towerCount: TOWERS.length,
+        towersImported: importedCount(),
         score: p.score,
         rank: ranks?.get(p.id),
         cooldown: this.mode.cooldown(p),

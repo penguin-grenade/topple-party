@@ -202,6 +202,9 @@ function onMessage(raw: unknown) {
     case 'bye':
       leaveGame(m.reason);
       break;
+    case 'note':
+      toast(m.text);
+      break;
   }
 }
 
@@ -313,6 +316,13 @@ function render() {
       plus.disabled = tn >= count;
       minus.onclick = () => setTower(-1);
       plus.onclick = () => setTower(1);
+      // tower files: paste one in (or pick a .json file) and the TV adds it to the list
+      const imp = document.createElement('div');
+      imp.className = 'importRow';
+      imp.innerHTML = `<button id="impBtn" class="hbtn small">Import tower file…</button>${v.towersImported ? `<button id="impClear" class="hbtn small">Remove imported (${v.towersImported})</button>` : ''}`;
+      hp.appendChild(imp);
+      imp.querySelector<HTMLButtonElement>('#impBtn')!.onclick = () => openImport();
+      imp.querySelector<HTMLButtonElement>('#impClear')?.addEventListener('click', () => send({ t: 'host', a: 'tower-clear' }));
     }
     const start = document.createElement('button');
     start.className = 'start';
@@ -345,6 +355,44 @@ function render() {
         : '';
   $('touchpad').classList.toggle('hidden', aimMode !== 'touch' || v.control === 'none');
   $('camPad').classList.toggle('hidden', !v.camera);
+}
+
+/** The import sheet: paste tower-file JSON or choose a .json file; the text goes to the TV to be checked. */
+function openImport() {
+  const sheet = $('importSheet');
+  const ta = sheet.querySelector('textarea')!;
+  ta.value = '';
+  sheet.classList.remove('hidden');
+  ta.focus();
+}
+function sendTowerText(text: string) {
+  let compact = text.trim();
+  try {
+    compact = JSON.stringify(JSON.parse(compact)); // strip whitespace: it travels over the game's data channel
+  } catch {
+    toast("That isn't valid JSON.");
+    return;
+  }
+  if (compact.length > 400_000) {
+    toast('That tower file is too big (400 KB max).');
+    return;
+  }
+  send({ t: 'host', a: 'tower-json', json: compact });
+  $('importSheet').classList.add('hidden');
+  toast('Sent to the TV…');
+}
+{
+  const sheet = $('importSheet');
+  const ta = sheet.querySelector('textarea')!;
+  sheet.querySelector<HTMLButtonElement>('#impSend')!.onclick = () => sendTowerText(ta.value);
+  sheet.querySelector<HTMLButtonElement>('#impCancel')!.onclick = () => sheet.classList.add('hidden');
+  const file = sheet.querySelector<HTMLInputElement>('#impFile')!;
+  file.onchange = () => {
+    const f = file.files?.[0];
+    if (!f) return;
+    f.text().then((t) => sendTowerText(t));
+    file.value = '';
+  };
 }
 
 function hostButton(text: string, cls: string, fn: () => void) {

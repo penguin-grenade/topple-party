@@ -80,6 +80,17 @@
   .start, .hbtn { border: 0; border-radius: 999px; padding: 14px; font-size: 22px; font-weight: 700; background: #ffffff1c; }
   .start { background: #33c46a; box-shadow: 0 5px 0 #1f8546; }
   .start:active { transform: translateY(3px); box-shadow: 0 2px 0 #1f8546; }
+  .importRow { display: flex; gap: 8px; }
+  .importRow .hbtn { flex: 1; }
+  .hbtn.small { font-size: 16px; padding: 10px; }
+  #importSheet { position: fixed; inset: 0; background: #14102ae6; z-index: 30; display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+  #importSheet h3 { margin: 0; font-size: 20px; }
+  #importSheet p { margin: 0; font-size: 14px; opacity: .8; line-height: 1.35; }
+  #importSheet textarea { flex: 1; min-height: 160px; border-radius: 14px; border: 2px solid #ffffff33; background: #0006; color: #fff; font: 13px/1.3 ui-monospace, Menlo, Consolas, monospace; padding: 10px; resize: none; }
+  #importSheet .row { display: flex; gap: 8px; }
+  #importSheet .row .hbtn { flex: 1; }
+  #importSheet label.file { flex: 1; text-align: center; border-radius: 999px; padding: 10px; font-size: 16px; font-weight: 700; background: #ffffff1c; }
+  #importSheet input[type=file] { display: none; }
 
   #touchpad { flex: 1; min-height: 120px; border-radius: 20px; border: 3px dashed #ffffff33; display: flex; align-items: center; justify-content: center;
     color: var(--muted); font-weight: 600; touch-action: none; position: relative; }
@@ -157,6 +168,13 @@
     <header><span id="swatch"></span><span id="pname">Player</span><span id="pscore">0 pts</span></header>
     <div id="status"><h1 id="title">Hi!</h1><p id="sub"></p><div id="ammo"></div></div>
     <div id="hostPanel" class="hidden"></div>
+    <div id="importSheet" class="hidden">
+      <h3>Import a tower file</h3>
+      <p>Paste the JSON from your tower designer, or pick the .json file. The TV checks it and adds it to the tower list.</p>
+      <textarea placeholder='{ "format": "topple-tower", "version": 1, ... }' spellcheck="false"></textarea>
+      <div class="row"><label class="file">Choose .json file<input id="impFile" type="file" accept=".json,application/json" /></label></div>
+      <div class="row"><button id="impCancel" class="hbtn">Cancel</button><button id="impSend" class="hbtn start">Add to TV</button></div>
+    </div>
     <div id="camPad" class="hidden">
       <div class="camLabel">Drag <b>↔</b> to turn the tower<br />Drag <b>↕</b> to look higher / lower</div>
       <div class="zoomBtns"><button id="zoomIn" aria-label="Zoom in">＋</button><button id="zoomOut" aria-label="Zoom out">−</button></div>

@@ -807,3 +807,21 @@ export const TOWERS: TowerDef[] = [
 ];
 
 export const TOWER = TOWERS[0];
+
+/** How many towers are built in (custom ones from tower files come after these). */
+export const BUILTIN_TOWERS = TOWERS.length;
+
+/** Add a tower loaded from a tower file (replacing a custom tower with the same id). Returns its index. */
+export function addTower(def: TowerDef): number {
+  const i = TOWERS.findIndex((t, k) => k >= BUILTIN_TOWERS && t.id === def.id);
+  if (i >= 0) {
+    TOWERS[i] = def;
+    return i;
+  }
+  TOWERS.push(def);
+  return TOWERS.length - 1;
+}
+export function removeCustomTowers() {
+  TOWERS.length = BUILTIN_TOWERS;
+}
+export const isCustomTower = (i: number) => i >= BUILTIN_TOWERS;

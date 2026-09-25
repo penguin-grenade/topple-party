@@ -184,6 +184,11 @@ src/shared/           protocol, networking (PeerJS / BroadcastChannel), QR encod
 src/controller/       phone: motion.ts (pointer + flick detection), main.ts (UI)
 src/tv/sim/           physics (Rapier): blocks, levels, explosions, scoring, Tower Pull grab
 src/tv/sim/towers.ts  the twenty-one Tower Pull towers; pull.ts has the shared pulled-out/toppled rules
+src/tv/sim/towerFile.ts  tower file format: validation, structural checks, to/from JSON (no three.js/physics)
+src/tv/towerLoader.ts bundled tower files, ?tower= URLs, phone imports
+public/towers/        tower files the game loads (index.json lists them); examples/ = the built-ins as files
+scripts/towers.ts     export the built-ins, rebuild the index, check a file
+docs/tower-format.md  the tower file format
 src/tv/render/        three.js scene, procedural textures, particles
 src/tv/game.ts        players, lobby, networking glue, TV remote input
 src/tv/modes.ts       Practice, Blast Party, Best Shot, Tower Pull
@@ -195,11 +200,21 @@ Adding a level: add an entry to `LEVELS` in `src/tv/sim/levels.ts`. Builders lik
 `b.column`, `b.row`, `b.pyramid` and `b.pyramid3d` place blocks; anything that falls below its
 stand's top scores.
 
-Adding a tower: add an entry to `TOWERS` in `src/tv/sim/towers.ts`. `layer(b, y, { n, len, ang, cx, cz, skip, gold })`
+Adding a tower in code: add an entry to `TOWERS` in `src/tv/sim/towers.ts`. `layer(b, y, { n, len, ang, cx, cz, skip, gold })`
 lays `n` pieces of length `len` side by side, running along `ang` (any angle), and returns the top;
 `piece()` places a single piece and `fill()` packs pieces across a span (handy for corbels).
 The camera frames each tower automatically. Run `tsx tests/towers-check.ts <id> --survey --games 12`
 to check it.
+
+### Tower files (for a tower designer)
+
+Towers can also be plain JSON **tower files**: a flat list of pieces and crowns any tool can
+write. [docs/tower-format.md](docs/tower-format.md) has the format; `public/towers/examples/`
+has every built-in tower exported as one. The game loads files listed in `public/towers/index.json`
+at start-up, any `?tower=<url>` on the TV page, and files the host pastes or picks on their phone
+(**Import tower file…** in the lobby). `npm run towers:check my.json` runs the structural checks
+(overlaps, floating blocks, single-parallel supports) and `tsx tests/towers-check.ts my.json --survey`
+runs the physics.
 
 ## Android app details
 

@@ -3,13 +3,13 @@
 import { buildLevel } from './sim/levels';
 import { TOWERS } from './sim/towers';
 
-const cache = new Map<number, string>();
+const cache = new WeakMap<object, string>();
 
 /** SVG silhouette of tower `i`, seen from roughly where the game camera starts. */
 export function towerSilhouette(i: number): string {
-  const hit = cache.get(i);
-  if (hit) return hit;
   const def = TOWERS[i];
+  const hit = cache.get(def);
+  if (hit) return hit;
   const spec = buildLevel(def, 1);
   const yaw = ((def.yaw ?? 35.6) * Math.PI) / 180;
   const ux = Math.cos(yaw), uz = -Math.sin(yaw); // screen-right direction
@@ -44,6 +44,6 @@ export function towerSilhouette(i: number): string {
     .map((s) => `<rect x="${r(s.u0 - u0 + pad)}" y="${r(top - s.y1 + pad)}" width="${r(s.u1 - s.u0)}" height="${r(s.y1 - s.y0)}" fill="${s.fill}" stroke="#8a6232" stroke-width="0.05"/>`)
     .join('');
   const svg = `<svg class="tSil" viewBox="0 0 ${r(w)} ${r(h)}" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${rects}</svg>`;
-  cache.set(i, svg);
+  cache.set(def, svg);
   return svg;
 }

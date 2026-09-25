@@ -11,8 +11,11 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "signal": "peerjs --port 9000 --path /",
-    "test:physics": "tsx tests/physics-check.ts && tsx tests/towers-check.ts all --survey",
-    "test:towers": "tsx tests/towers-check.ts all --survey --games 12 --careful 3"
+    "test:physics": "tsx tests/physics-check.ts && tsx tests/tower-file-check.ts && tsx tests/towers-check.ts all --survey",
+    "test:towers": "tsx tests/towers-check.ts all --survey --games 12 --careful 3",
+    "towers:export": "tsx scripts/towers.ts export",
+    "towers:index": "tsx scripts/towers.ts index",
+    "towers:check": "tsx scripts/towers.ts check"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

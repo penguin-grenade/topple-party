@@ -44,6 +44,8 @@ export interface PadView {
   tower?: number;
   towerName?: string;
   towerCount?: number;
+  /** how many of the towers were imported from tower files at runtime */
+  towersImported?: number;
 }
 
 export type HostAction =
@@ -51,6 +53,9 @@ export type HostAction =
   | { a: 'rounds'; n: number }
   /** Tower Pull: first tower, 1-based */
   | { a: 'tower'; n: number }
+  /** Tower Pull: add a tower from a tower file (JSON text) / forget every imported tower */
+  | { a: 'tower-json'; json: string }
+  | { a: 'tower-clear' }
   | { a: 'start' }
   | { a: 'again' }
   | { a: 'lobby' }
@@ -77,6 +82,8 @@ export type S2C =
   | { t: 'view'; v: PadView }
   | { t: 'buzz'; ms: number | number[] }
   | { t: 'pong'; ts: number }
+  /** a short message to show the player (e.g. why an import failed) */
+  | { t: 'note'; text: string }
   | { t: 'full' }
   | { t: 'bye'; reason: string };
 

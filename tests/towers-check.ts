@@ -1,6 +1,6 @@
 // Headless Tower Pull tower lab.
 //
-//   tsx tests/towers-check.ts [all | tower ids or numbers...] [--survey] [--sample N] [--games N] [--careful N] [--seed S]
+//   tsx tests/towers-check.ts [all | tower ids or numbers | tower .json files...] [--survey] [--sample N] [--games N] [--careful N] [--seed S]
 //   (env: HZ=contact stiffness, SUB=physics substeps, WHY=1 to explain every trap)
 //
 // For each tower:
@@ -21,6 +21,8 @@ import { TOWERS, TOWER_CONTACT_HZ, type TowerDef } from '../src/tv/sim/towers';
 import { isPiece, pieceAxis, pieceLength, outDistance, outThreshold, snapshotOf, fallenPieces, fallenCrown } from '../src/tv/sim/pull';
 import type { BlockType } from '../src/tv/sim/blocks';
 import { VARIANTS } from './tower-variants';
+import { parseTowerJson, checkTowerJson, towerFromJson } from '../src/tv/sim/towerFile';
+import fs from 'node:fs';
 
 const HZ = Number(process.env.HZ ?? TOWER_CONTACT_HZ);
 const args = process.argv.slice(2);
@@ -31,8 +33,23 @@ const num = (n: string, d: number) => {
 };
 const VALUED = ['--games', '--careful', '--seed', '--sample'];
 const ids = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && VALUED.includes(args[i - 1])));
-const ALL = [...TOWERS, ...VARIANTS];
-const pickTowers = ids.length === 0 || ids.includes('all') ? TOWERS : ALL.filter((t) => ids.includes(t.id) || ids.includes(String(ALL.indexOf(t) + 1)));
+// tower files (paths ending in .json) are checked structurally, then run like any other tower
+const fileTowers: TowerDef[] = ids
+  .filter((a) => a.endsWith('.json'))
+  .map((f) => {
+    const { tower, check } = parseTowerJson(fs.readFileSync(f, 'utf8'));
+    const c = tower ? checkTowerJson(tower) : check;
+    for (const e of c.errors) console.log(`${f}: ERROR ${e}`);
+    for (const w of c.warnings) console.log(`${f}: warning ${w}`);
+    if (!tower || !c.ok) {
+      process.exitCode = 1;
+      return null;
+    }
+    return towerFromJson(tower) as TowerDef;
+  })
+  .filter((t): t is TowerDef => !!t);
+const ALL = [...TOWERS, ...VARIANTS, ...fileTowers];
+const pickTowers = ids.length === 0 || ids.includes('all') ? TOWERS : ALL.filter((t) => ids.includes(t.id) || ids.includes(String(ALL.indexOf(t) + 1)) || fileTowers.includes(t));
 
 let rngState = num('--seed', 7);
 const rnd = () => {
